@@ -77,15 +77,25 @@ UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, SPACE, BACKSPACE, TAB, CTRL_A = (
 )
 
 
+_CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, " ": SPACE, "\x08": BACKSPACE, "\x7f": BACKSPACE,
+          "\t": TAB, "\x01": CTRL_A, "\x03": ESC}
+_CSI_LETTERS = {"A": UP, "B": DOWN, "H": HOME, "F": END}
+_CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN}
+
+
 class _Keys:
     """Raw single-key input on Windows (msvcrt) and Unix (termios)."""
+
+    def __init__(self, fd: int | None = None):
+        self._fd = fd
 
     def __enter__(self):
         if sys.platform != "win32":
             import termios
             import tty
 
-            self._fd = sys.stdin.fileno()
+            if self._fd is None:
+                self._fd = sys.stdin.fileno()
             self._old = termios.tcgetattr(self._fd)
             tty.setraw(self._fd)
         return self
@@ -103,20 +113,47 @@ class _Keys:
             ch = msvcrt.getwch()
             if ch in ("\x00", "\xe0"):  # arrows and other special keys come in two parts
                 return {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END}.get(msvcrt.getwch(), "")
-        else:
-            ch = sys.stdin.read(1)
-            if ch == "\x1b":
-                import select
+            return _CHARS.get(ch, ch)
+        return self._read_posix()
 
-                if not select.select([sys.stdin], [], [], 0.03)[0]:
-                    return ESC
-                seq = sys.stdin.read(2)
-                if seq[1:] in ("5", "6", "1", "4"):
-                    sys.stdin.read(1)  # trailing "~"
-                return {"[A": UP, "[B": DOWN, "[5": PGUP, "[6": PGDN, "[H": HOME, "[F": END,
-                        "[1": HOME, "[4": END}.get(seq, "")
-        return {"\r": ENTER, "\n": ENTER, "\x1b": ESC, " ": SPACE, "\x08": BACKSPACE, "\x7f": BACKSPACE,
-                "\t": TAB, "\x01": CTRL_A, "\x03": ESC}.get(ch, ch)
+    # Read the file descriptor directly. sys.stdin.read(1) pulls the whole escape
+    # sequence into Python's buffer, where select() can't see the rest of it, so
+    # every arrow key looked like a lone Esc.
+    def _ready(self, timeout: float) -> bool:
+        import select
+
+        return bool(select.select([self._fd], [], [], timeout)[0])
+
+    def _byte(self) -> bytes:
+        return os.read(self._fd, 1)
+
+    def _read_posix(self) -> str:
+        b = self._byte()
+        if not b:
+            return ESC  # end of input
+        if b == b"\x1b":
+            if not self._ready(0.05):
+                return ESC
+            seq = self._byte()
+            if seq not in (b"[", b"O"):
+                return ""  # Alt+key
+            final = b""
+            while self._ready(0.05):
+                final = self._byte()
+                if 0x40 <= final[0] <= 0x7E:
+                    break
+                seq += final
+            params = seq[1:].decode("ascii", "replace").split(";")[0]
+            if final == b"~":
+                return _CSI_TILDE.get(params, "")
+            return _CSI_LETTERS.get(final.decode("ascii", "replace"), "")
+        if b[0] >= 0xC0:  # first byte of a multi-byte UTF-8 character
+            need = 1 if b[0] < 0xE0 else 2 if b[0] < 0xF0 else 3
+            while need and self._ready(0.05):
+                b += self._byte()
+                need -= 1
+        ch = b.decode("utf-8", errors="replace")
+        return _CHARS.get(ch, ch)
 
 
 # ---------- drawing ----------
