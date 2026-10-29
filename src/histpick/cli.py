@@ -27,6 +27,25 @@ def parse_numbers(text: str, count: int) -> list[int]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    finally:
+        _pause_if_double_clicked()
+
+
+def _pause_if_double_clicked() -> None:
+    # A double-clicked histpick.exe gets its own console that vanishes when we exit.
+    # If we're the only process attached to it, keep it open so the message stays readable.
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return
+    import ctypes
+
+    procs = (ctypes.c_uint32 * 2)()
+    if ctypes.windll.kernel32.GetConsoleProcessList(procs, 2) == 1:
+        input("Press Enter to close.")
+
+
+def _main(argv: list[str] | None) -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         sys.stdout.reconfigure(errors="replace")
 
