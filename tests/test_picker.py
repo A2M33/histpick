@@ -58,3 +58,18 @@ def test_scroll_follows_cursor():
 def test_one_line():
     assert one_line("a\nb\nc", 80) == "a  (+2 lines)"
     assert one_line("x" * 20, 10) == "x" * 9 + "…"
+
+
+def test_space_goes_into_the_filter_and_words_are_and_terms():
+    from histpick.picker import _CHARS
+
+    assert _CHARS.get(" ", " ") == " "  # space is typed, not a choose key
+    s = state()
+    for ch in "git m":
+        s.type(ch)
+    assert s.query == "git m"
+    assert [s.items[i] for i in s.visible()] == ["git commit -m x"]
+    s = state()
+    for ch in "x git":  # order of words doesn't matter
+        s.type(ch)
+    assert [s.items[i] for i in s.visible()] == ["git commit -m x"]

@@ -23,8 +23,9 @@ class PickerState:
     chosen: set[int] = field(default_factory=set)  # indexes into items
 
     def visible(self) -> list[int]:
-        q = self.query.lower()
-        return [i for i, c in enumerate(self.items) if q in c.lower()]
+        # Each space-separated word must appear somewhere in the command, in any order.
+        words = self.query.lower().split()
+        return [i for i, c in enumerate(self.items) if all(w in c.lower() for w in words)]
 
     def move(self, delta: int) -> None:
         n = len(self.visible())
@@ -72,12 +73,13 @@ def one_line(cmd: str, width: int) -> str:
 
 # ---------- keys ----------
 
-UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, SPACE, BACKSPACE, TAB, CTRL_A = (
-    "up", "down", "pgup", "pgdn", "home", "end", "enter", "esc", "space", "backspace", "tab", "ctrl-a",
+UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, BACKSPACE, TAB, CTRL_A = (
+    "up", "down", "pgup", "pgdn", "home", "end", "enter", "esc", "backspace", "tab", "ctrl-a",
 )
 
 
-_CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, " ": SPACE, "\x08": BACKSPACE, "\x7f": BACKSPACE,
+# Space is an ordinary character so it can go into the filter; Tab chooses.
+_CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, "\x08": BACKSPACE, "\x7f": BACKSPACE,
           "\t": TAB, "\x01": CTRL_A, "\x03": ESC}
 _CSI_LETTERS = {"A": UP, "B": DOWN, "H": HOME, "F": END}
 _CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN}
@@ -187,7 +189,7 @@ def _draw(s: PickerState, title: str) -> None:
         text = one_line(s.items[idx], cols - 7)
         line = f" {mark} {text}"
         out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == s.cursor else line + "\r\n")
-    out.append("\x1b[2m↑↓ move  space choose  ctrl+a all  enter save  esc cancel\x1b[0m")
+    out.append("\x1b[2m↑↓ move  tab choose  ctrl+a all  enter save  esc cancel\x1b[0m")
     sys.stdout.write("".join(out))
     sys.stdout.flush()
 
@@ -217,7 +219,7 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                     s.move(-len(items))
                 elif k == END:
                     s.move(len(items))
-                elif k in (SPACE, TAB):
+                elif k == TAB:
                     s.toggle()
                 elif k == CTRL_A:
                     s.toggle_all_visible()

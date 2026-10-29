@@ -33,8 +33,8 @@ histpick -o setup     # save as setup.ps1 / setup.sh
 | Key | Action |
 | --- | --- |
 | `↑` `↓`, `PgUp` `PgDn` | Move |
-| `Space` or `Tab` | Choose or unchoose a command |
-| Typing | Filter the list |
+| `Tab` | Choose or unchoose a command |
+| Typing | Filter the list. `git push` shows commands that contain both words, in any order |
 | `Ctrl+A` | Choose everything that matches the filter |
 | `Enter` | Save (with nothing chosen, it saves the highlighted command) |
 | `Esc` | Cancel |
