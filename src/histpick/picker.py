@@ -21,6 +21,7 @@ class PickerState:
     cursor: int = 0  # index into visible()
     top: int = 0  # first visible row on screen
     chosen: set[int] = field(default_factory=set)  # indexes into items
+    order: list[int] = field(default_factory=list)  # script order from the last review
 
     def visible(self) -> list[int]:
         # Each space-separated word must appear somewhere in the command, in any order.
@@ -57,10 +58,57 @@ class PickerState:
         return [self.items[i] for i in sorted(self.chosen, reverse=True)]
 
     def scroll(self, height: int) -> None:
-        if self.cursor < self.top:
-            self.top = self.cursor
-        elif self.cursor >= self.top + height:
-            self.top = self.cursor - height + 1
+        _scroll(self, height)
+
+    def review(self) -> ReviewState:
+        """The review screen: earlier review order first, newly chosen commands after it in run order."""
+        kept = [i for i in self.order if i in self.chosen]
+        new = [i for i in sorted(self.chosen, reverse=True) if i not in kept]
+        return ReviewState(self.items, kept + new)
+
+    def back_from(self, review: ReviewState) -> None:
+        self.order = list(review.order)
+        self.chosen = set(review.order)
+
+
+@dataclass
+class ReviewState:
+    """The chosen commands in script order, before saving."""
+
+    items: list[str]
+    order: list[int]  # indexes into items, top of the script first
+    cursor: int = 0
+    top: int = 0
+
+    def move(self, delta: int) -> None:
+        n = len(self.order)
+        self.cursor = max(0, min(n - 1, self.cursor + delta)) if n else 0
+
+    def shift(self, delta: int) -> None:
+        """Move the highlighted command up (-1) or down (+1) in the script."""
+        j = self.cursor + delta
+        if self.order and 0 <= j < len(self.order):
+            o = self.order
+            o[self.cursor], o[j] = o[j], o[self.cursor]
+            self.cursor = j
+
+    def remove(self) -> None:
+        if self.order:
+            del self.order[self.cursor]
+            self.move(0)
+
+    def result(self) -> list[str]:
+        return [self.items[i] for i in self.order]
+
+    def scroll(self, height: int) -> None:
+        _scroll(self, height)
+
+
+def _scroll(s, height: int) -> None:
+    if s.cursor < s.top:
+        s.top = s.cursor
+    elif s.cursor >= s.top + height:
+        s.top = s.cursor - height + 1
 
 
 def one_line(cmd: str, width: int) -> str:
@@ -76,12 +124,16 @@ def one_line(cmd: str, width: int) -> str:
 UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, BACKSPACE, TAB, CTRL_A = (
     "up", "down", "pgup", "pgdn", "home", "end", "enter", "esc", "backspace", "tab", "ctrl-a",
 )
+MOVE_UP, MOVE_DOWN = "move-up", "move-down"  # Ctrl/Alt/Shift + arrow
 
 
 # Space is an ordinary character so it can go into the filter; Tab chooses.
 _CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, "\x08": BACKSPACE, "\x7f": BACKSPACE,
           "\t": TAB, "\x01": CTRL_A, "\x03": ESC}
+_WIN_SPECIAL = {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END,
+                "\x8d": MOVE_UP, "\x91": MOVE_DOWN, "\x98": MOVE_UP, "\xa0": MOVE_DOWN}
 _CSI_LETTERS = {"A": UP, "B": DOWN, "H": HOME, "F": END}
+_CSI_MODIFIED = {"A": MOVE_UP, "B": MOVE_DOWN}
 _CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN}
 
 
@@ -114,7 +166,7 @@ class _Keys:
 
             ch = msvcrt.getwch()
             if ch in ("\x00", "\xe0"):  # arrows and other special keys come in two parts
-                return {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END}.get(msvcrt.getwch(), "")
+                return _WIN_SPECIAL.get(msvcrt.getwch(), "")
             return _CHARS.get(ch, ch)
         return self._read_posix()
 
@@ -145,10 +197,13 @@ class _Keys:
                 if 0x40 <= final[0] <= 0x7E:
                     break
                 seq += final
-            params = seq[1:].decode("ascii", "replace").split(";")[0]
+            params = seq[1:].decode("ascii", "replace").split(";")
             if final == b"~":
-                return _CSI_TILDE.get(params, "")
-            return _CSI_LETTERS.get(final.decode("ascii", "replace"), "")
+                return _CSI_TILDE.get(params[0], "")
+            letter = final.decode("ascii", "replace")
+            if len(params) > 1 and letter in _CSI_MODIFIED:  # "1;5A" is Ctrl+Up
+                return _CSI_MODIFIED[letter]
+            return _CSI_LETTERS.get(letter, "")
         if b[0] >= 0xC0:  # first byte of a multi-byte UTF-8 character
             need = 1 if b[0] < 0xE0 else 2 if b[0] < 0xF0 else 3
             while need and self._ready(0.05):
@@ -189,27 +244,86 @@ def _draw(s: PickerState, title: str) -> None:
         text = one_line(s.items[idx], cols - 7)
         line = f" {mark} {text}"
         out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == s.cursor else line + "\r\n")
-    out.append("\x1b[2m↑↓ move  tab choose  ctrl+a all  enter save  esc cancel\x1b[0m")
+    out.append("\x1b[2m↑↓ move  tab choose  ctrl+a all  enter review  esc cancel\x1b[0m")
     sys.stdout.write("".join(out))
     sys.stdout.flush()
 
 
+def _draw_review(r: ReviewState, title: str) -> None:
+    cols, rows = shutil.get_terminal_size((100, 30))
+    height = max(3, rows - 4)
+    r.scroll(height)
+    n = len(r.order)
+    width = len(str(n))
+    out = ["\x1b[H\x1b[2J"]
+    out.append(f"\x1b[1m{title}: review\x1b[0m  \x1b[2m{n} command{'s' if n != 1 else ''}\x1b[0m\r\n")
+    out.append("\x1b[2mThe script runs these from top to bottom.\x1b[0m\r\n")
+    for row in range(height):
+        i = r.top + row
+        if i >= n:
+            out.append("\r\n")
+            continue
+        line = f" {i + 1:>{width}}  {one_line(r.items[r.order[i]], cols - width - 4)}"
+        out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == r.cursor else line + "\r\n")
+    out.append("\x1b[2m↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back\x1b[0m")
+    sys.stdout.write("".join(out))
+    sys.stdout.flush()
+
+
+def _review_key(r: ReviewState, k: str, page: int) -> None:
+    if k == UP:
+        r.move(-1)
+    elif k == DOWN:
+        r.move(1)
+    elif k == PGUP:
+        r.move(-page)
+    elif k == PGDN:
+        r.move(page)
+    elif k == HOME:
+        r.move(-len(r.order))
+    elif k == END:
+        r.move(len(r.order))
+    elif k in (MOVE_UP, "u", "U"):
+        r.shift(-1)
+    elif k in (MOVE_DOWN, "d", "D"):
+        r.shift(1)
+    elif k in ("x", "X", BACKSPACE):
+        r.remove()
+
+
 def pick(items: list[str], title: str = "histpick") -> list[str] | None:
-    """Interactive picker. Returns chosen commands oldest first, or None if cancelled."""
+    """Interactive picker. Returns chosen commands in script order, or None if cancelled.
+
+    Enter opens a review screen where you can reorder or drop commands; Enter there
+    saves and Esc goes back to the list.
+    """
     if os.environ.get("TERM") == "dumb":
         raise RuntimeError("this terminal can't show the picker; use --pick or --last")
     _enable_ansi()
     s = PickerState(items)
+    review: ReviewState | None = None
     sys.stdout.write("\x1b[?1049h\x1b[?25l")  # alternate screen, hide cursor
     try:
         with _Keys() as keys:
             while True:
-                _draw(s, title)
+                if review is not None:
+                    _draw_review(review, title)
+                else:
+                    _draw(s, title)
                 k = keys.read()
                 page = max(3, shutil.get_terminal_size((100, 30)).lines - 4)
-                if k == UP:
+                if review is not None:
+                    if k == ENTER:
+                        return review.result()
+                    if k == ESC:
+                        s.back_from(review)
+                        review = None
+                    else:
+                        _review_key(review, k, page)
+                    continue
+                if k in (UP, MOVE_UP):
                     s.move(-1)
-                elif k == DOWN:
+                elif k in (DOWN, MOVE_DOWN):
                     s.move(1)
                 elif k == PGUP:
                     s.move(-page)
@@ -228,7 +342,9 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                 elif k == ENTER:
                     if not s.chosen and s.visible():
                         s.toggle()  # Enter on nothing chosen takes the highlighted line
-                    return s.result()
+                    if not s.chosen:
+                        return []
+                    review = s.review()
                 elif k == ESC:
                     return None
                 elif len(k) == 1 and k.isprintable():

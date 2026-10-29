@@ -11,13 +11,16 @@ from .picker import pick
 
 
 def parse_numbers(text: str, count: int) -> list[int]:
-    """'1 3-5,8' -> [0, 2, 3, 4, 7]. Numbers are 1-based, as shown by --list."""
+    """'1 5-3,8' -> [0, 4, 3, 2, 7]. Numbers are 1-based, as shown by --list.
+
+    The result keeps the order you wrote, ranges included, because that is the
+    order the commands go into the script.
+    """
     out: list[int] = []
     for part in text.replace(",", " ").split():
         if "-" in part:
-            a, b = part.split("-", 1)
-            lo, hi = sorted((int(a), int(b)))
-            out.extend(range(lo, hi + 1))
+            a, b = (int(x) for x in part.split("-", 1))
+            out.extend(range(a, b + 1) if a <= b else range(a, b - 1, -1))
         else:
             out.append(int(part))
     bad = [n for n in out if not 1 <= n <= count]
@@ -100,7 +103,7 @@ def _main(argv: list[str] | None) -> int:
         except ValueError as e:
             print(e, file=sys.stderr)
             return 2
-        chosen = [items[i] for i in sorted(idx, reverse=True)]
+        chosen = [items[i] for i in idx]
     else:
         if not sys.stdin.isatty() or not sys.stdout.isatty():
             print("Not a terminal. Use --list with --pick, or --last.", file=sys.stderr)

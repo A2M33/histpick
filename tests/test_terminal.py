@@ -72,6 +72,8 @@ def test_arrow_keys_move_instead_of_cancelling(term, tmp_path):
     t = term("-o", "out")
     t.key(b"\x1b[B")  # down: from "echo three" to "echo two"
     t.key(b"\t")
+    t.key(b"\r")  # review screen
+    assert b"review" in t.out
     assert t.finish(b"\r") == 0, t.out
     script = (tmp_path / "out.sh").read_text(encoding="utf-8")
     assert "echo two" in script
@@ -87,7 +89,8 @@ def test_key_reader_decodes_escape_sequences():
     try:
         with picker._Keys(slave) as keys:
             for data, want in [(b"\x1b[A", picker.UP), (b"\x1bOB", picker.DOWN), (b"\x1b[5~", picker.PGUP),
-                               (b"\x1b[1;5H", picker.HOME), ("é".encode(), "é"), (b"x", "x")]:
+                               (b"\x1b[1;5H", picker.HOME), (b"\x1b[1;5A", picker.MOVE_UP),
+                               ("é".encode(), "é"), (b"x", "x")]:
                 os.write(master, data)
                 assert keys.read() == want, data
             os.write(master, b"\x1b")
@@ -95,3 +98,14 @@ def test_key_reader_decodes_escape_sequences():
     finally:
         os.close(master)
         os.close(slave)
+
+
+def test_review_screen_reorders_before_saving(term, tmp_path):
+    t = term("-o", "out")
+    t.key(b"\t")  # echo three
+    t.key(b"\t")  # echo two
+    t.key(b"\r")  # review: echo two, echo three
+    t.key(b"d")  # move echo two below echo three
+    assert t.finish(b"\r") == 0, t.out
+    script = (tmp_path / "out.sh").read_text(encoding="utf-8")
+    assert script.index("echo three") < script.index("echo two")

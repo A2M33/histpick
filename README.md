@@ -36,19 +36,29 @@ histpick -o setup     # save as setup.ps1 / setup.sh
 | `Tab` | Choose or unchoose a command |
 | Typing | Filter the list. `git push` shows commands that contain both words, in any order |
 | `Ctrl+A` | Choose everything that matches the filter |
-| `Enter` | Save (with nothing chosen, it saves the highlighted command) |
+| `Enter` | Review the chosen commands (with nothing chosen, it takes the highlighted one) |
 | `Esc` | Cancel |
 
-The list shows the newest command first and each command once. The script keeps the order you ran them in.
+The list shows the newest command first and each command once. If you ran a command twice, histpick places it where you ran it last, so the review screen shows the commands in the order they will run before you save:
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` | Select a command |
+| `Ctrl+↑` `Ctrl+↓`, or `U` `D` | Move it up or down in the script |
+| `X` or `Backspace` | Remove it |
+| `Enter` | Save |
+| `Esc` | Go back to the list |
 
 ### Without the picker
 
 ```bash
 histpick --list                 # numbered list, 1 = newest
-histpick --pick "2 5-7" -o fix  # save commands 2, 5, 6 and 7
+histpick --pick "7-5 2" -o fix  # save commands 7, 6, 5 and 2, in that order
 histpick --last 4 --print       # print the last 4 commands as a script
 histpick --grep docker          # only offer commands containing "docker"
 ```
+
+`--pick` writes the commands in the order you list the numbers. `--last` keeps the order you ran them in.
 
 Other options: `--shell bash` to read another shell's history, `--limit 500` to offer more commands (default 300), `--force` to overwrite a file.
 

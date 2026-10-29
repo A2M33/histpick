@@ -19,7 +19,7 @@ def ps_history(tmp_path, monkeypatch):
 
 def test_parse_numbers():
     assert parse_numbers("1 3-5,8", 10) == [0, 2, 3, 4, 7]
-    assert parse_numbers("5-3 3", 10) == [2, 3, 4]
+    assert parse_numbers("5-3 3", 10) == [4, 3, 2]
     with pytest.raises(ValueError):
         parse_numbers("11", 10)
 
@@ -32,8 +32,8 @@ def test_list_shows_newest_first_without_own_calls(ps_history, capsys):
     assert not any("histpick" in line for line in lines)
 
 
-def test_pick_saves_in_run_order(ps_history, tmp_path, capsys):
-    assert main(["--shell", "powershell", "--pick", "1 3", "-o", "setup"]) == 0
+def test_pick_saves_in_the_order_given(ps_history, tmp_path, capsys):
+    assert main(["--shell", "powershell", "--pick", "3 1", "-o", "setup"]) == 0
     out = (tmp_path / "setup.ps1").read_text(encoding="utf-8-sig")
     assert out.index("winget install") < out.index("git config")
     assert "$ErrorActionPreference = 'Stop'" in out
@@ -72,3 +72,10 @@ def test_scripts_stop_when_a_program_fails():
     fish = render(["git clone x"], "fish")
     assert fish.endswith("git clone x\nor exit $status\n")
     assert "set -e" in render(["ls"], "zsh")
+
+
+def test_pick_order_wins_over_history_order(ps_history, capsys):
+    # 1 = git config (newest), 3 = winget (oldest): the script follows the numbers
+    assert main(["--shell", "powershell", "--pick", "1 3", "--print"]) == 0
+    out = capsys.readouterr().out
+    assert out.index("git config") < out.index("winget install")
