@@ -144,12 +144,16 @@ def parse_fish(text: str) -> list[str]:
 
 
 def recent_unique(commands: list[str], limit: int | None = None) -> list[str]:
-    """Newest first, each command once (its latest use wins)."""
+    """Newest first, each command once (its latest use wins).
+
+    "git status" and "git status " count as the same command.
+    """
     seen, out = set(), []
     for c in reversed(commands):
-        if c in seen:
+        key = c.rstrip()
+        if key in seen:
             continue
-        seen.add(c)
+        seen.add(key)
         out.append(c)
         if limit and len(out) >= limit:
             break

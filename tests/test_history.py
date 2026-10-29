@@ -66,3 +66,7 @@ def test_zsh_non_ascii_is_unmetafied(tmp_path):
     f = tmp_path / ".zsh_history"
     f.write_bytes(zsh_metafy(": 1700000000:0;echo é à 日本\n: 1700000001:0;ls\n"))
     assert history.read(history.Shell("zsh", ".sh", f)) == ["echo é à 日本", "ls"]
+
+
+def test_recent_unique_ignores_trailing_whitespace():
+    assert recent_unique(["git status", "ls", "git status  ", "git status\t"]) == ["git status\t", "ls"]
