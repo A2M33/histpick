@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "histpick"
+dynamic = ["version"]
+description = "Pick commands from your shell history and save them as a script. PowerShell, bash, zsh and fish."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "A2M33" }]
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["shell", "history", "powershell", "bash", "zsh", "fish", "cli", "script"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: System :: Shells",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/A2M33/histpick"
+
+[project.scripts]
+histpick = "histpick.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.dynamic]
+version = { attr = "histpick.__version__" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
