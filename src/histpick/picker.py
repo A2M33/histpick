@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 class PickerState:
     items: list[str]  # newest first
     query: str = ""
+    pos: int = 0  # text cursor in query
     cursor: int = 0  # index into visible()
     top: int = 0  # first visible row on screen
     chosen: set[int] = field(default_factory=set)  # indexes into items
@@ -57,13 +58,41 @@ class PickerState:
         else:
             self.chosen |= vis
 
-    def type(self, ch: str) -> None:
-        self.query += ch
+    # ----- editing the filter; pos is the text cursor inside query -----
+
+    def _set_query(self, query: str, pos: int) -> None:
+        self.query, self.pos = query, pos
         self.cursor = self.top = 0
 
+    def type(self, ch: str) -> None:
+        self._set_query(self.query[: self.pos] + ch + self.query[self.pos:], self.pos + len(ch))
+
     def backspace(self) -> None:
-        self.query = self.query[:-1]
-        self.cursor = self.top = 0
+        if self.pos:
+            self._set_query(self.query[: self.pos - 1] + self.query[self.pos:], self.pos - 1)
+
+    def delete(self) -> None:
+        if self.pos < len(self.query):
+            self._set_query(self.query[: self.pos] + self.query[self.pos + 1:], self.pos)
+
+    def left(self) -> None:
+        self.pos = max(0, self.pos - 1)
+
+    def right(self) -> None:
+        self.pos = min(len(self.query), self.pos + 1)
+
+    def clear(self) -> None:
+        self._set_query("", 0)
+
+    def escape(self) -> bool:
+        """Esc undoes the filter or the chosen-only view first. True means cancel."""
+        if self.query:
+            self.clear()
+        elif self.only_chosen:
+            self.toggle_only_chosen()
+        else:
+            return True
+        return False
 
     def result(self) -> list[str]:
         """Chosen commands in the order you ran them (oldest first)."""
@@ -137,17 +166,17 @@ UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, BACKSPACE, TAB, CTRL_A = (
     "up", "down", "pgup", "pgdn", "home", "end", "enter", "esc", "backspace", "tab", "ctrl-a",
 )
 MOVE_UP, MOVE_DOWN = "move-up", "move-down"  # Ctrl/Alt/Shift + arrow
-CTRL_O = "ctrl-o"
+CTRL_O, CTRL_U, CTRL_C, LEFT, RIGHT, DELETE = "ctrl-o", "ctrl-u", "ctrl-c", "left", "right", "delete"
 
 
 # Space is an ordinary character so it can go into the filter; Tab chooses.
 _CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, "\x08": BACKSPACE, "\x7f": BACKSPACE,
-          "\t": TAB, "\x01": CTRL_A, "\x0f": CTRL_O, "\x03": ESC}
-_WIN_SPECIAL = {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END,
-                "\x8d": MOVE_UP, "\x91": MOVE_DOWN, "\x98": MOVE_UP, "\xa0": MOVE_DOWN}
-_CSI_LETTERS = {"A": UP, "B": DOWN, "H": HOME, "F": END}
+          "\t": TAB, "\x01": CTRL_A, "\x0f": CTRL_O, "\x15": CTRL_U, "\x03": CTRL_C}
+_WIN_SPECIAL = {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END, "K": LEFT, "M": RIGHT,
+                "S": DELETE, "\x8d": MOVE_UP, "\x91": MOVE_DOWN, "\x98": MOVE_UP, "\xa0": MOVE_DOWN}
+_CSI_LETTERS = {"A": UP, "B": DOWN, "C": RIGHT, "D": LEFT, "H": HOME, "F": END}
 _CSI_MODIFIED = {"A": MOVE_UP, "B": MOVE_DOWN}
-_CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN}
+_CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN, "3": DELETE}
 
 
 class _Keys:
@@ -197,7 +226,7 @@ class _Keys:
     def _read_posix(self) -> str:
         b = self._byte()
         if not b:
-            return ESC  # end of input
+            return CTRL_C  # end of input
         if b == b"\x1b":
             if not self._ready(0.05):
                 return ESC
@@ -269,7 +298,10 @@ def _draw(s: PickerState, title: str) -> None:
     view = "  showing chosen only" if s.only_chosen else ""
     out = ["\x1b[H\x1b[2J"]
     out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}\x1b[0m\r\n")
-    out.append(f"filter: {s.query}\x1b[2m{'' if s.query else '(type to filter)'}\x1b[0m\r\n")
+    q, p = s.query, s.pos
+    caret = f"\x1b[7m{q[p] if p < len(q) else ' '}\x1b[0m"  # the cursor is hidden, so draw one
+    hint = "" if q else "\x1b[2m(type to filter, words in any order)\x1b[0m"
+    out.append(f"filter: {q[:p]}{caret}{q[p + 1:]}{hint}\r\n")
     for row in range(height):
         i = s.top + row
         if i >= len(vis):
@@ -281,7 +313,7 @@ def _draw(s: PickerState, title: str) -> None:
         line = f" {mark} {text}"
         out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == s.cursor else line + "\r\n")
     out += pane
-    help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  enter review  esc cancel"
+    help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel"
     out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
     sys.stdout.write("".join(out))
     sys.stdout.flush()
@@ -328,7 +360,7 @@ def _review_key(r: ReviewState, k: str, page: int) -> None:
         r.shift(-1)
     elif k in (MOVE_DOWN, "d", "D"):
         r.shift(1)
-    elif k in ("x", "X", BACKSPACE):
+    elif k in ("x", "X", BACKSPACE, DELETE):
         r.remove()
 
 
@@ -353,6 +385,8 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                     _draw(s, title)
                 k = keys.read()
                 page = max(3, shutil.get_terminal_size((100, 30)).lines - 4)
+                if k == CTRL_C:
+                    return None
                 if review is not None:
                     if k == ENTER:
                         return review.result()
@@ -382,6 +416,14 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                     s.toggle_all_visible()
                 elif k == BACKSPACE:
                     s.backspace()
+                elif k == DELETE:
+                    s.delete()
+                elif k == LEFT:
+                    s.left()
+                elif k == RIGHT:
+                    s.right()
+                elif k == CTRL_U:
+                    s.clear()
                 elif k == ENTER:
                     if not s.chosen and s.visible():
                         s.toggle()  # Enter on nothing chosen takes the highlighted line
@@ -389,7 +431,8 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                         return []
                     review = s.review()
                 elif k == ESC:
-                    return None
+                    if s.escape():
+                        return None
                 elif len(k) == 1 and k.isprintable():
                     s.type(k)
     finally:

@@ -175,3 +175,38 @@ def test_screen_shows_match_count_and_preview(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "1/3" in out
     assert "  do echo $f\r\n" in out  # first frame: the multi-line command is highlighted
+
+
+def test_filter_editing():
+    s = state()
+    for ch in "gt":
+        s.type(ch)
+    s.left()
+    s.type("i")  # "git"
+    assert s.query == "git" and s.pos == 2
+    s.right(), s.right(), s.right()
+    assert s.pos == 3
+    s.left(), s.left(), s.left(), s.left()
+    assert s.pos == 0
+    s.backspace()  # nothing before the cursor
+    s.delete()  # removes "g"
+    assert s.query == "it" and s.pos == 0
+    s.clear()
+    assert s.query == "" and s.pos == 0 and len(s.visible()) == 4
+
+
+def test_first_esc_clears_filter_second_cancels(monkeypatch):
+    from histpick.picker import CTRL_C, ENTER, ESC, TAB
+
+    s = state()
+    s.type("n")
+    assert s.escape() is False and s.query == ""
+    s.toggle_only_chosen()
+    assert s.escape() is False and not s.only_chosen
+    assert s.escape() is True
+
+    items = ["git push", "npm test"]
+    # Esc clears "npm", so the next Tab chooses the first line of the full list
+    assert run_pick(monkeypatch, items, [*"npm", ESC, TAB, ENTER, ENTER]) == ["git push"]
+    assert run_pick(monkeypatch, items, [*"npm", ESC, ESC]) is None
+    assert run_pick(monkeypatch, items, [*"npm", CTRL_C]) is None

@@ -37,10 +37,12 @@ After saving, histpick prints the full path and the command that runs the script
 | `↑` `↓`, `PgUp` `PgDn` | Move |
 | `Tab` | Choose or unchoose a command |
 | Typing | Filter the list. `git push` shows commands that contain both words, in any order |
+| `←` `→`, `Backspace`, `Delete` | Edit the filter |
+| `Ctrl+U` | Clear the filter |
 | `Ctrl+A` | Choose everything that matches the filter |
 | `Ctrl+O` | Show only the chosen commands; press again to show all |
 | `Enter` | Review the chosen commands (with nothing chosen, it takes the highlighted one) |
-| `Esc` | Cancel |
+| `Esc` | Clear the filter; press it again to cancel |
 
 The list shows the newest command first and each command once. The top line counts the matches, like `12/300`. When you highlight a multi-line command, a pane under the list shows all of its lines.
 
