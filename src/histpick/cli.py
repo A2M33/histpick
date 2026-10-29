@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 from pathlib import Path
 
@@ -36,16 +37,29 @@ def main(argv: list[str] | None = None) -> int:
         _pause_if_double_clicked()
 
 
-def _pause_if_double_clicked() -> None:
-    # A double-clicked histpick.exe gets its own console that vanishes when we exit.
-    # If we're the only process attached to it, keep it open so the message stays readable.
+def _double_clicked() -> bool:
+    # A double-clicked histpick.exe gets its own console, with no shell attached to it.
     if sys.platform != "win32" or not getattr(sys, "frozen", False):
-        return
+        return False
     import ctypes
 
     procs = (ctypes.c_uint32 * 2)()
-    if ctypes.windll.kernel32.GetConsoleProcessList(procs, 2) == 1:
+    return ctypes.windll.kernel32.GetConsoleProcessList(procs, 2) == 1
+
+
+def _pause_if_double_clicked() -> None:
+    # That console vanishes when we exit; keep it open so the message stays readable.
+    if _double_clicked():
         input("Press Enter to close.")
+
+
+def run_hint(path: Path, shell: str, platform: str = sys.platform) -> str:
+    """The command that runs a saved script."""
+    if shell == "powershell":
+        if platform == "win32":  # Windows blocks unsigned scripts by default
+            return f'powershell -ExecutionPolicy Bypass -File "{path}"'
+        return f'pwsh -File "{path}"'
+    return f"{shell} {shlex.quote(str(path))}"
 
 
 def _main(argv: list[str] | None) -> int:
@@ -129,5 +143,9 @@ def _main(argv: list[str] | None) -> int:
     except FileExistsError as e:
         print(e, file=sys.stderr)
         return 2
+    path = path.resolve()
     print(f"Saved {len(chosen)} command{'s' if len(chosen) != 1 else ''} to {path}")
+    if _double_clicked():
+        print(f"Open this folder to find it: {path.parent}")
+    print(f"Run it with: {run_hint(path, shell.name)}")
     return 0

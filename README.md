@@ -30,6 +30,8 @@ histpick              # pick commands, save as histpick-<date>.ps1 (or .sh)
 histpick -o setup     # save as setup.ps1 / setup.sh
 ```
 
+After saving, histpick prints the full path and the command that runs the script. On Windows that command is `powershell -ExecutionPolicy Bypass -File "<path>"`, since Windows refuses to run unsigned `.ps1` files by default.
+
 | Key | Action |
 | --- | --- |
 | `↑` `↓`, `PgUp` `PgDn` | Move |

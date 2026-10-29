@@ -79,3 +79,23 @@ def test_pick_order_wins_over_history_order(ps_history, capsys):
     assert main(["--shell", "powershell", "--pick", "1 3", "--print"]) == 0
     out = capsys.readouterr().out
     assert out.index("git config") < out.index("winget install")
+
+
+def test_save_message_has_full_path_and_run_command(ps_history, tmp_path, capsys):
+    assert main(["--shell", "powershell", "--last", "1", "-o", "setup"]) == 0
+    out = capsys.readouterr().out
+    full = str((tmp_path / "setup.ps1").resolve())
+    assert f"to {full}" in out
+    assert "Run it with: " in out and full in out.splitlines()[-1]
+
+
+def test_run_hint():
+    from pathlib import Path, PurePosixPath
+
+    from histpick.cli import run_hint
+
+    p = Path("C:/Users/me/setup.ps1")
+    assert run_hint(p, "powershell", "win32") == f'powershell -ExecutionPolicy Bypass -File "{p}"'
+    assert run_hint(PurePosixPath("/home/me/setup.ps1"), "powershell", "linux").startswith("pwsh -File ")
+    assert run_hint(PurePosixPath("/home/me/my setup.sh"), "bash", "linux") == "bash '/home/me/my setup.sh'"
+    assert run_hint(PurePosixPath("/home/me/x.fish"), "fish", "darwin") == "fish /home/me/x.fish"
