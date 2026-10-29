@@ -10,10 +10,18 @@ from pathlib import Path
 
 HEADERS = {
     # Stop at the first failing command, like you would have when typing them by hand.
-    "powershell": "$ErrorActionPreference = 'Stop'",
+    # $ErrorActionPreference only covers cmdlets. PowerShell 7.4+ can stop on failing
+    # programs too; 5.1 can't, so CHECKS adds an exit code test after every command.
+    # LASTEXITCODE starts at 0 so a failure from before the script doesn't stop it.
+    "powershell": "$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n"
+                  "$global:LASTEXITCODE = 0",
     "bash": "#!/usr/bin/env bash\nset -euo pipefail",
     "zsh": "#!/usr/bin/env zsh\nset -euo pipefail",
-    "fish": "#!/usr/bin/env fish",
+    "fish": "#!/usr/bin/env fish",  # fish has no set -e; see CHECKS
+}
+CHECKS = {
+    "powershell": "if ($LASTEXITCODE) { exit $LASTEXITCODE }",
+    "fish": "or exit $status",
 }
 LABELS = {"powershell": "PowerShell", "bash": "bash", "zsh": "zsh", "fish": "fish"}
 
@@ -27,7 +35,9 @@ def render(commands: list[str], shell: str, now: datetime | None = None) -> str:
         top = [shebang, note] + ([rest] if rest else [])
     else:
         top = [note, header]
-    return "\n".join(top) + "\n\n" + "\n\n".join(commands) + "\n"
+    check = CHECKS.get(shell)
+    body = [f"{c}\n{check}" if check else c for c in commands]
+    return "\n".join(top) + "\n\n" + "\n\n".join(body) + "\n"
 
 
 def default_name(ext: str, now: datetime | None = None) -> str:

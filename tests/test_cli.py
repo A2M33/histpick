@@ -61,3 +61,14 @@ def test_is_own_command():
 def test_grep_searches_past_the_limit(ps_history, capsys):
     assert main(["--shell", "powershell", "--grep", "winget", "--limit", "1", "--list"]) == 0
     assert capsys.readouterr().out.splitlines() == ["1  winget install Git.Git"]
+
+
+def test_scripts_stop_when_a_program_fails():
+    ps = render(["git clone x", "cd x"], "powershell")
+    assert "$PSNativeCommandUseErrorActionPreference = $true" in ps
+    assert "$global:LASTEXITCODE = 0" in ps
+    assert ps.endswith("git clone x\nif ($LASTEXITCODE) { exit $LASTEXITCODE }\n\n"
+                       "cd x\nif ($LASTEXITCODE) { exit $LASTEXITCODE }\n")
+    fish = render(["git clone x"], "fish")
+    assert fish.endswith("git clone x\nor exit $status\n")
+    assert "set -e" in render(["ls"], "zsh")

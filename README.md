@@ -57,13 +57,17 @@ Other options: `--shell bash` to read another shell's history, `--limit 500` to 
 ```powershell
 # Saved with histpick from PowerShell history on 2026-10-29 13:10
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$global:LASTEXITCODE = 0
 
 winget install --id Git.Git -e
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 git clone https://github.com/A2M33/spacetrail
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
 ```
 
-The first line after the comment makes the script stop at the first error, the way you would stop if you were typing. bash and zsh scripts get `set -euo pipefail` for the same reason. Read the script before you run it: your history may contain one-off commands, passwords typed in clear text or paths that only exist on your machine.
+The script stops at the first error, the way you would stop if you were typing. `$ErrorActionPreference` stops it when a PowerShell cmdlet fails. Windows PowerShell 5.1 ignores the exit code of programs like `git` and `winget`, so histpick adds the `$LASTEXITCODE` check after each command. bash and zsh scripts get `set -euo pipefail`. fish has no such switch, so each command in a fish script gets `or exit $status` after it. Read the script before you run it: your history may contain one-off commands, passwords typed in clear text or paths that only exist on your machine.
 
 ## Where history comes from
 
