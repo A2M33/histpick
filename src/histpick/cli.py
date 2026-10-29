@@ -76,9 +76,10 @@ def _main(argv: list[str] | None) -> int:
         return 1
 
     commands = [c for c in history.read(shell) if not writer.is_own_command(c)]
-    items = history.recent_unique(commands, args.limit)
-    if args.grep:
+    items = history.recent_unique(commands)
+    if args.grep:  # search the whole history, then keep the newest matches
         items = [c for c in items if args.grep.lower() in c.lower()]
+    items = items[: args.limit]
     if not items:
         print("No matching commands.", file=sys.stderr)
         return 1

@@ -56,3 +56,8 @@ def test_is_own_command():
     assert is_own_command("histpick --list")
     assert is_own_command(r"C:\tools\histpick.exe -o x")
     assert not is_own_command("git status")
+
+
+def test_grep_searches_past_the_limit(ps_history, capsys):
+    assert main(["--shell", "powershell", "--grep", "winget", "--limit", "1", "--list"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["1  winget install Git.Git"]
