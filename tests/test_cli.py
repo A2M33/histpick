@@ -99,3 +99,46 @@ def test_run_hint():
     assert run_hint(PurePosixPath("/home/me/setup.ps1"), "powershell", "linux").startswith("pwsh -File ")
     assert run_hint(PurePosixPath("/home/me/my setup.sh"), "bash", "linux") == "bash '/home/me/my setup.sh'"
     assert run_hint(PurePosixPath("/home/me/x.fish"), "fish", "darwin") == "fish /home/me/x.fish"
+
+
+def test_bad_numbers_give_a_clear_error(ps_history, capsys):
+    for bad in ("abc", "1-", "-3", "2-x"):
+        with pytest.raises(ValueError, match="not a number or a range"):
+            parse_numbers(bad, 10)
+    assert main(["--shell", "powershell", "--pick", "abc", "--print"]) == 2
+    assert capsys.readouterr().err.strip() == '"abc" is not a number or a range like 3-5'
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "x"])
+def test_last_and_limit_must_be_positive(ps_history, capsys, value):
+    for flag in ("--last", "--limit"):
+        with pytest.raises(SystemExit) as e:
+            main(["--shell", "powershell", flag, value, "--print"])
+        assert e.value.code == 2
+        err = capsys.readouterr().err
+        assert "must be 1 or more" in err or "is not a number" in err
+
+
+def test_output_into_a_missing_folder(ps_history, tmp_path, capsys):
+    assert main(["--shell", "powershell", "--last", "1", "-o", "nodir/x"]) == 0
+    assert (tmp_path / "nodir" / "x.ps1").is_file()
+
+
+def test_unwritable_output_is_a_clean_error(ps_history, tmp_path, capsys):
+    (tmp_path / "afile").write_text("", encoding="utf-8")
+    assert main(["--shell", "powershell", "--last", "1", "-o", "afile/x"]) == 2
+    assert capsys.readouterr().err.startswith("Can't write ")
+
+
+def test_empty_history_says_so(ps_history, capsys):
+    ps_history.write_text("", encoding="utf-8")
+    assert main(["--shell", "powershell", "--list"]) == 1
+    assert "has no commands in it" in capsys.readouterr().err
+    ps_history.write_text("histpick --list\n", encoding="utf-8")
+    assert main(["--shell", "powershell", "--list"]) == 1
+    assert "has no commands in it" in capsys.readouterr().err
+
+
+def test_grep_without_matches_says_what_it_searched(ps_history, capsys):
+    assert main(["--shell", "powershell", "--grep", "docker", "--list"]) == 1
+    assert 'contains "docker"' in capsys.readouterr().err

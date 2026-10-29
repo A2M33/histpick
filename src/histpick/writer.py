@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import sys
@@ -48,6 +49,10 @@ def default_name(ext: str, now: datetime | None = None) -> str:
 def save(text: str, path: Path, shell: str, force: bool = False) -> Path:
     if path.exists() and not force:
         raise FileExistsError(f"{path} already exists (use --force to overwrite)")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)  # -o scripts/setup makes scripts/
+    except FileExistsError:  # a file is in the way; keep FileExistsError for the case above
+        raise NotADirectoryError(errno.ENOTDIR, f"{path.parent} is a file, not a folder") from None
     # Windows PowerShell 5.1 reads a .ps1 without a BOM as ANSI and mangles non-English text.
     encoding = "utf-8-sig" if shell == "powershell" else "utf-8"
     newline = "\r\n" if shell == "powershell" and sys.platform == "win32" else "\n"

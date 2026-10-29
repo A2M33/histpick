@@ -19,15 +19,25 @@ def parse_numbers(text: str, count: int) -> list[int]:
     """
     out: list[int] = []
     for part in text.replace(",", " ").split():
-        if "-" in part:
-            a, b = (int(x) for x in part.split("-", 1))
-            out.extend(range(a, b + 1) if a <= b else range(a, b - 1, -1))
-        else:
-            out.append(int(part))
+        a, dash, b = part.partition("-")
+        if not a.isdigit() or (dash and not b.isdigit()):
+            raise ValueError(f'"{part}" is not a number or a range like 3-5')
+        a, b = int(a), int(b or a)
+        out.extend(range(a, b + 1) if a <= b else range(a, b - 1, -1))
     bad = [n for n in out if not 1 <= n <= count]
     if bad:
         raise ValueError(f"no command number {bad[0]} (there are {count})")
     return [n - 1 for n in dict.fromkeys(out)]
+
+
+def positive(text: str) -> int:
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'"{text}" is not a number') from None
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or more, not {n}")
+    return n
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -73,11 +83,11 @@ def _main(argv: list[str] | None) -> int:
     p.add_argument("-o", "--output", help="file to write (default: histpick-<date>.<ext> in this folder)")
     p.add_argument("--shell", choices=["powershell", "bash", "zsh", "fish"],
                    help="whose history to read (default: detected)")
-    p.add_argument("--limit", type=int, default=300, help="how many recent commands to offer (default 300)")
+    p.add_argument("--limit", type=positive, default=300, help="how many recent commands to offer (default 300)")
     p.add_argument("--grep", default="", help="only offer commands containing this text")
     p.add_argument("--list", action="store_true", help="print recent commands with numbers and exit")
     p.add_argument("--pick", metavar="NUMBERS", help='choose by number without the picker, e.g. "1 3-5"')
-    p.add_argument("--last", type=int, metavar="N", help="take the last N commands without the picker")
+    p.add_argument("--last", type=positive, metavar="N", help="take the last N commands without the picker")
     p.add_argument("--print", action="store_true", help="print the script instead of saving it")
     p.add_argument("--force", action="store_true", help="overwrite the output file")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -93,13 +103,18 @@ def _main(argv: list[str] | None) -> int:
         return 1
 
     commands = [c for c in history.read(shell) if not writer.is_own_command(c)]
+    if not commands:
+        print(f"{shell.path} has no commands in it.", file=sys.stderr)
+        if shell.name == "bash":
+            print("bash saves history when the shell exits; run `history -a` to save it now.", file=sys.stderr)
+        return 1
     items = history.recent_unique(commands)
     if args.grep:  # search the whole history, then keep the newest matches
         items = [c for c in items if args.grep.lower() in c.lower()]
+        if not items:
+            print(f'No command in {shell.path} contains "{args.grep}".', file=sys.stderr)
+            return 1
     items = items[: args.limit]
-    if not items:
-        print("No matching commands.", file=sys.stderr)
-        return 1
 
     if args.list:
         width = len(str(len(items)))
@@ -142,6 +157,9 @@ def _main(argv: list[str] | None) -> int:
         writer.save(text, path, shell.name, args.force)
     except FileExistsError as e:
         print(e, file=sys.stderr)
+        return 2
+    except OSError as e:
+        print(f"Can't write {path}: {e.strerror or e}", file=sys.stderr)
         return 2
     path = path.resolve()
     print(f"Saved {len(chosen)} command{'s' if len(chosen) != 1 else ''} to {path}")
