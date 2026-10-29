@@ -52,10 +52,16 @@ def detect() -> Shell | None:
 
 
 def _parent_shell_hint() -> str | None:
+    # Check the Unix-style variables first: Windows sets PSModulePath for every
+    # program, Git Bash included, so it only means PowerShell when nothing else matches.
+    shell = os.path.basename(os.environ.get("SHELL", "")).lower().removesuffix(".exe")
+    if shell in ("bash", "zsh", "fish"):
+        return shell
+    if os.environ.get("MSYSTEM"):  # Git Bash and MSYS2
+        return "bash"
     if os.environ.get("PSModulePath") and sys.platform == "win32":
         return "powershell"
-    shell = os.path.basename(os.environ.get("SHELL", ""))
-    return shell if shell in ("bash", "zsh", "fish") else None
+    return None
 
 
 def read(shell: Shell) -> list[str]:

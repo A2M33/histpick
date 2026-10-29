@@ -32,3 +32,18 @@ def test_fish():
 def test_recent_unique_keeps_latest_order():
     assert recent_unique(["a", "b", "a", "c"]) == ["c", "a", "b"]
     assert recent_unique(["a", "b", "c"], limit=2) == ["c", "b"]
+
+
+def test_git_bash_on_windows_is_not_mistaken_for_powershell(monkeypatch):
+    from histpick import history
+
+    monkeypatch.setattr(history.sys, "platform", "win32")
+    monkeypatch.setenv("PSModulePath", r"C:\Program Files\WindowsPowerShell\Modules")
+    monkeypatch.delenv("SHELL", raising=False)
+    monkeypatch.setenv("MSYSTEM", "MINGW64")
+    assert history._parent_shell_hint() == "bash"
+    monkeypatch.delenv("MSYSTEM")
+    monkeypatch.setenv("SHELL", "/usr/bin/bash")
+    assert history._parent_shell_hint() == "bash"
+    monkeypatch.delenv("SHELL")
+    assert history._parent_shell_hint() == "powershell"
