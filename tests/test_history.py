@@ -70,3 +70,14 @@ def test_zsh_non_ascii_is_unmetafied(tmp_path):
 
 def test_recent_unique_ignores_trailing_whitespace():
     assert recent_unique(["git status", "ls", "git status  ", "git status\t"]) == ["git status\t", "ls"]
+
+
+def test_looks_secret():
+    from histpick.history import looks_secret
+
+    for cmd in ["mysql -u root --password=hunter2", "export GITHUB_TOKEN=abc", "curl -H 'Authorization: Bearer abc.def'",
+                "set API_KEY=1", "az login --client-secret x", "aws configure set aws_access_key_id AKIAIOSFODNN7EXAMPLE",
+                "git clone https://ghp_" + "a" * 36 + "@github.com/me/repo", "$env:apikey = 'x'"]:
+        assert looks_secret(cmd), cmd
+    for cmd in ["git status", "pwd", "npm install", "echo bearer", "cd ~/akiapath"]:
+        assert not looks_secret(cmd), cmd

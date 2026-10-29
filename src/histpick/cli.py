@@ -121,7 +121,9 @@ def _main(argv: list[str] | None) -> int:
         for n, c in enumerate(items, 1):
             first, *rest = c.splitlines() or [""]
             more = f"  (+{len(rest)} lines)" if rest else ""
-            print(f"{n:>{width}}  {first}{more}")
+            print(f"{n:>{width}} {'!' if history.looks_secret(c) else ' '} {first}{more}")
+        if any(history.looks_secret(c) for c in items):
+            print("! = may contain a password or token", file=sys.stderr)
         return 0
 
     if args.last:
@@ -145,6 +147,13 @@ def _main(argv: list[str] | None) -> int:
     if not chosen:
         print("Nothing chosen.")
         return 1
+
+    secrets = [c for c in chosen if history.looks_secret(c)]
+    if secrets:
+        print(f"Warning: {len(secrets)} of the chosen commands may contain a password or token. "
+              "Check the script before you share it:", file=sys.stderr)
+        for c in secrets:
+            print(f"  ! {c.splitlines()[0]}", file=sys.stderr)
 
     text = writer.render(chosen, shell.name)
     if args.print:

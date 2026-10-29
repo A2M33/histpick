@@ -210,3 +210,13 @@ def test_first_esc_clears_filter_second_cancels(monkeypatch):
     assert run_pick(monkeypatch, items, [*"npm", ESC, TAB, ENTER, ENTER]) == ["git push"]
     assert run_pick(monkeypatch, items, [*"npm", ESC, ESC]) is None
     assert run_pick(monkeypatch, items, [*"npm", CTRL_C]) is None
+
+
+def test_picker_and_review_mark_secrets(monkeypatch, capsys):
+    from histpick.picker import ENTER, ESC, TAB
+
+    items = ["export API_KEY=x", "ls"]
+    run_pick(monkeypatch, items, [TAB, ENTER, ESC, ESC])
+    out = capsys.readouterr().out
+    assert "may contain a password or token" in out  # legend in the list
+    assert "1 of these may contain a password or token" in out  # warning in review

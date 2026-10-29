@@ -84,7 +84,9 @@ git clone https://github.com/A2M33/spacetrail
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 ```
 
-The script stops at the first error, the way you would stop if you were typing. `$ErrorActionPreference` stops it when a PowerShell cmdlet fails. Windows PowerShell 5.1 ignores the exit code of programs like `git` and `winget`, so histpick adds the `$LASTEXITCODE` check after each command. bash and zsh scripts get `set -euo pipefail`. fish has no such switch, so each command in a fish script gets `or exit $status` after it. Read the script before you run it: your history may contain one-off commands, passwords typed in clear text or paths that only exist on your machine.
+The script stops at the first error, the way you would stop if you were typing. `$ErrorActionPreference` stops it when a PowerShell cmdlet fails. Windows PowerShell 5.1 ignores the exit code of programs like `git` and `winget`, so histpick adds the `$LASTEXITCODE` check after each command. bash and zsh scripts get `set -euo pipefail`. fish has no such switch, so each command in a fish script gets `or exit $status` after it.
+
+Read the script before you run it: your history may contain one-off commands, passwords typed in clear text or paths that only exist on your machine. histpick puts a `!` next to commands that mention a password, token, secret or API key, or that hold an AWS or GitHub key, both in the picker and in `--list`, and warns you before it saves one. It matches words and key formats, so it can miss a secret, and it will flag `npm token list` too.
 
 ## Where history comes from
 

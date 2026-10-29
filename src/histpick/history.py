@@ -143,6 +143,19 @@ def parse_fish(text: str) -> list[str]:
     return out
 
 
+_SECRET_WORDS = re.compile(r"password|passwd|token|api[_-]?key|secret|\bbearer\s+\S", re.IGNORECASE)
+_SECRET_KEYS = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{30,}|\bgithub_pat_\w{20,}")
+
+
+def looks_secret(cmd: str) -> bool:
+    """True if the command probably contains a password, token or key.
+
+    It only looks for telltale words and key formats (AWS access keys, GitHub tokens),
+    so it can flag a harmless command and miss a real secret.
+    """
+    return bool(_SECRET_WORDS.search(cmd) or _SECRET_KEYS.search(cmd))
+
+
 def recent_unique(commands: list[str], limit: int | None = None) -> list[str]:
     """Newest first, each command once (its latest use wins).
 

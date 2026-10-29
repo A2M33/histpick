@@ -60,7 +60,7 @@ def test_is_own_command():
 
 def test_grep_searches_past_the_limit(ps_history, capsys):
     assert main(["--shell", "powershell", "--grep", "winget", "--limit", "1", "--list"]) == 0
-    assert capsys.readouterr().out.splitlines() == ["1  winget install Git.Git"]
+    assert capsys.readouterr().out.splitlines() == ["1   winget install Git.Git"]
 
 
 def test_scripts_stop_when_a_program_fails():
@@ -142,3 +142,20 @@ def test_empty_history_says_so(ps_history, capsys):
 def test_grep_without_matches_says_what_it_searched(ps_history, capsys):
     assert main(["--shell", "powershell", "--grep", "docker", "--list"]) == 1
     assert 'contains "docker"' in capsys.readouterr().err
+
+
+def test_secrets_are_marked_and_warned_about(ps_history, tmp_path, capsys):
+    with open(ps_history, "a", encoding="utf-8") as f:
+        f.write("$env:GITHUB_TOKEN = 'abc123'\n")
+    assert main(["--shell", "powershell", "--list"]) == 0
+    out = capsys.readouterr()
+    assert out.out.splitlines()[0] == "1 ! $env:GITHUB_TOKEN = 'abc123'"
+    assert out.out.splitlines()[1].startswith("2   ")
+    assert "may contain a password or token" in out.err
+    assert main(["--shell", "powershell", "--pick", "1", "-o", "s"]) == 0
+    err = capsys.readouterr().err
+    assert err.startswith("Warning: 1 of the chosen commands may contain a password or token")
+    assert "  ! $env:GITHUB_TOKEN = 'abc123'" in err
+    assert (tmp_path / "s.ps1").is_file()
+    assert main(["--shell", "powershell", "--pick", "2", "--print"]) == 0
+    assert "Warning" not in capsys.readouterr().err

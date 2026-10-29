@@ -11,6 +11,10 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 
+from .history import looks_secret
+
+SECRET_MARK = "\x1b[33m!\x1b[0m"  # beside commands that may contain a password or token
+
 # ---------- logic ----------
 
 
@@ -296,8 +300,11 @@ def _draw(s: PickerState, title: str) -> None:
     s.scroll(height)
     vis = s.visible()
     view = "  showing chosen only" if s.only_chosen else ""
+    flagged = any(looks_secret(s.items[j]) for j in vis[s.top: s.top + height])
+    legend = f"  {SECRET_MARK} \x1b[2mmay contain a password or token\x1b[0m" if flagged else ""
     out = ["\x1b[H\x1b[2J"]
-    out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}\x1b[0m\r\n")
+    out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}\x1b[0m"
+               f"{legend}\r\n")
     q, p = s.query, s.pos
     caret = f"\x1b[7m{q[p] if p < len(q) else ' '}\x1b[0m"  # the cursor is hidden, so draw one
     hint = "" if q else "\x1b[2m(type to filter, words in any order)\x1b[0m"
@@ -308,10 +315,13 @@ def _draw(s: PickerState, title: str) -> None:
             out.append("\r\n")
             continue
         idx = vis[i]
-        mark = "\x1b[32m[x]\x1b[0m" if idx in s.chosen else "[ ]"
-        text = one_line(s.items[idx], cols - 7)
-        line = f" {mark} {text}"
-        out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == s.cursor else line + "\r\n")
+        chosen, secret = idx in s.chosen, looks_secret(s.items[idx])
+        text = one_line(s.items[idx], cols - 9)
+        if i == s.cursor:  # plain marks: a color reset inside would end the highlight
+            out.append(f"\x1b[7m {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} {text}\x1b[0m\r\n")
+        else:
+            mark = "\x1b[32m[x]\x1b[0m" if chosen else "[ ]"
+            out.append(f" {mark} {SECRET_MARK if secret else ' '} {text}\r\n")
     out += pane
     help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel"
     out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
@@ -328,14 +338,23 @@ def _draw_review(r: ReviewState, title: str) -> None:
     width = len(str(n))
     out = ["\x1b[H\x1b[2J"]
     out.append(f"\x1b[1m{title}: review\x1b[0m  \x1b[2m{n} command{'s' if n != 1 else ''}\x1b[0m\r\n")
-    out.append("\x1b[2mThe script runs these from top to bottom.\x1b[0m\r\n")
+    secrets = sum(looks_secret(c) for c in r.result())
+    if secrets:
+        out.append(f"{SECRET_MARK} \x1b[33m{secrets} of these may contain a password or token. "
+                   "Check the script before you share it.\x1b[0m\r\n")
+    else:
+        out.append("\x1b[2mThe script runs these from top to bottom.\x1b[0m\r\n")
     for row in range(height):
         i = r.top + row
         if i >= n:
             out.append("\r\n")
             continue
-        line = f" {i + 1:>{width}}  {one_line(r.items[r.order[i]], cols - width - 4)}"
-        out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == r.cursor else line + "\r\n")
+        cmd = r.items[r.order[i]]
+        text = one_line(cmd, cols - width - 6)
+        if i == r.cursor:
+            out.append(f"\x1b[7m {i + 1:>{width}} {'!' if looks_secret(cmd) else ' '} {text}\x1b[0m\r\n")
+        else:
+            out.append(f" {i + 1:>{width}} {SECRET_MARK if looks_secret(cmd) else ' '} {text}\r\n")
     out += pane
     help_ = "↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back"
     out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
