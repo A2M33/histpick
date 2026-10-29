@@ -22,11 +22,18 @@ class PickerState:
     top: int = 0  # first visible row on screen
     chosen: set[int] = field(default_factory=set)  # indexes into items
     order: list[int] = field(default_factory=list)  # script order from the last review
+    only_chosen: bool = False  # hide commands that aren't chosen
 
     def visible(self) -> list[int]:
         # Each space-separated word must appear somewhere in the command, in any order.
         words = self.query.lower().split()
-        return [i for i, c in enumerate(self.items) if all(w in c.lower() for w in words)]
+        return [i for i, c in enumerate(self.items)
+                if all(w in c.lower() for w in words) and (not self.only_chosen or i in self.chosen)]
+
+    def current(self) -> str | None:
+        """The highlighted command."""
+        vis = self.visible()
+        return self.items[vis[self.cursor]] if vis else None
 
     def move(self, delta: int) -> None:
         n = len(self.visible())
@@ -36,7 +43,12 @@ class PickerState:
         vis = self.visible()
         if vis:
             self.chosen ^= {vis[self.cursor]}
-            self.move(1)
+            # In the chosen-only view the line just disappeared; stay where it was.
+            self.move(0 if self.only_chosen else 1)
+
+    def toggle_only_chosen(self) -> None:
+        self.only_chosen = not self.only_chosen
+        self.cursor = self.top = 0
 
     def toggle_all_visible(self) -> None:
         vis = set(self.visible())
@@ -125,11 +137,12 @@ UP, DOWN, PGUP, PGDN, HOME, END, ENTER, ESC, BACKSPACE, TAB, CTRL_A = (
     "up", "down", "pgup", "pgdn", "home", "end", "enter", "esc", "backspace", "tab", "ctrl-a",
 )
 MOVE_UP, MOVE_DOWN = "move-up", "move-down"  # Ctrl/Alt/Shift + arrow
+CTRL_O = "ctrl-o"
 
 
 # Space is an ordinary character so it can go into the filter; Tab chooses.
 _CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, "\x08": BACKSPACE, "\x7f": BACKSPACE,
-          "\t": TAB, "\x01": CTRL_A, "\x03": ESC}
+          "\t": TAB, "\x01": CTRL_A, "\x0f": CTRL_O, "\x03": ESC}
 _WIN_SPECIAL = {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END,
                 "\x8d": MOVE_UP, "\x91": MOVE_DOWN, "\x98": MOVE_UP, "\xa0": MOVE_DOWN}
 _CSI_LETTERS = {"A": UP, "B": DOWN, "H": HOME, "F": END}
@@ -226,13 +239,36 @@ def _enable_ansi() -> None:
             k.SetConsoleMode(h, mode.value | 0x0004)
 
 
+def preview(cmd: str | None, width: int, max_rows: int) -> list[str]:
+    """All lines of a multi-line command, cut to fit; nothing for a one-line command."""
+    lines = (cmd or "").splitlines()
+    if len(lines) <= 1:
+        return []
+    if len(lines) > max_rows:
+        lines = lines[: max_rows - 1] + [f"… (+{len(lines) - max_rows + 1} more lines)"]
+    return [ln if len(ln) <= width else ln[: max(0, width - 1)] + "…" for ln in lines]
+
+
+def _fit(text: str, cols: int) -> str:
+    return text if len(text) < cols else text[: max(0, cols - 2)] + "…"
+
+
+def _preview_rows(cmd: str | None, cols: int, rows: int) -> list[str]:
+    lines = preview(cmd, cols - 4, max(2, rows // 3))
+    if not lines:
+        return []
+    return ["\x1b[2m" + "─" * (cols - 1) + "\x1b[0m\r\n"] + [f"  {ln}\r\n" for ln in lines]
+
+
 def _draw(s: PickerState, title: str) -> None:
     cols, rows = shutil.get_terminal_size((100, 30))
-    height = max(3, rows - 4)
+    pane = _preview_rows(s.current(), cols, rows)
+    height = max(3, rows - 4 - len(pane))
     s.scroll(height)
     vis = s.visible()
+    view = "  showing chosen only" if s.only_chosen else ""
     out = ["\x1b[H\x1b[2J"]
-    out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(s.chosen)} chosen\x1b[0m\r\n")
+    out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}\x1b[0m\r\n")
     out.append(f"filter: {s.query}\x1b[2m{'' if s.query else '(type to filter)'}\x1b[0m\r\n")
     for row in range(height):
         i = s.top + row
@@ -244,14 +280,17 @@ def _draw(s: PickerState, title: str) -> None:
         text = one_line(s.items[idx], cols - 7)
         line = f" {mark} {text}"
         out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == s.cursor else line + "\r\n")
-    out.append("\x1b[2m↑↓ move  tab choose  ctrl+a all  enter review  esc cancel\x1b[0m")
+    out += pane
+    help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  enter review  esc cancel"
+    out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
     sys.stdout.write("".join(out))
     sys.stdout.flush()
 
 
 def _draw_review(r: ReviewState, title: str) -> None:
     cols, rows = shutil.get_terminal_size((100, 30))
-    height = max(3, rows - 4)
+    pane = _preview_rows(r.items[r.order[r.cursor]] if r.order else None, cols, rows)
+    height = max(3, rows - 4 - len(pane))
     r.scroll(height)
     n = len(r.order)
     width = len(str(n))
@@ -265,7 +304,9 @@ def _draw_review(r: ReviewState, title: str) -> None:
             continue
         line = f" {i + 1:>{width}}  {one_line(r.items[r.order[i]], cols - width - 4)}"
         out.append(f"\x1b[7m{line}\x1b[0m\r\n" if i == r.cursor else line + "\r\n")
-    out.append("\x1b[2m↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back\x1b[0m")
+    out += pane
+    help_ = "↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back"
+    out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
     sys.stdout.write("".join(out))
     sys.stdout.flush()
 
@@ -335,6 +376,8 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
                     s.move(len(items))
                 elif k == TAB:
                     s.toggle()
+                elif k == CTRL_O:
+                    s.toggle_only_chosen()
                 elif k == CTRL_A:
                     s.toggle_all_visible()
                 elif k == BACKSPACE:

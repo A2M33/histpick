@@ -141,3 +141,37 @@ def test_pick_goes_through_review(monkeypatch, capsys):
     assert run_pick(monkeypatch, items, [TAB, TAB, ENTER, "x", ESC, DOWN, DOWN, TAB, ENTER, ENTER]) == \
         ["git push", "npm test"]
     assert "review" in capsys.readouterr().out
+
+
+def test_chosen_only_view():
+    s = state()
+    s.toggle()  # git push
+    s.move(1)
+    s.toggle()  # npm test
+    s.toggle_only_chosen()
+    assert [s.items[i] for i in s.visible()] == ["git push", "npm test"]
+    s.move(1)
+    s.toggle()  # unchoose npm test: it leaves the view, the cursor stays in range
+    assert [s.items[i] for i in s.visible()] == ["git push"] and s.cursor == 0
+    s.toggle_only_chosen()
+    assert len(s.visible()) == 4
+
+
+def test_preview_of_multiline_commands():
+    from histpick.picker import preview
+
+    assert preview("ls", 80, 5) == []
+    assert preview(None, 80, 5) == []
+    assert preview("for f in *\ndo echo $f\ndone", 80, 5) == ["for f in *", "do echo $f", "done"]
+    assert preview("a\nb\nc\nd\ne", 80, 3) == ["a", "b", "… (+3 more lines)"]
+    assert preview("a\n" + "x" * 20, 10, 5) == ["a", "x" * 9 + "…"]
+
+
+def test_screen_shows_match_count_and_preview(monkeypatch, capsys):
+    from histpick.picker import ESC
+
+    items = ["for f in *\ndo echo $f\ndone", "git push", "npm test"]
+    run_pick(monkeypatch, items, [*"git", ESC, ESC])
+    out = capsys.readouterr().out
+    assert "1/3" in out
+    assert "  do echo $f\r\n" in out  # first frame: the multi-line command is highlighted
