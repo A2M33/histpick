@@ -47,3 +47,22 @@ def test_git_bash_on_windows_is_not_mistaken_for_powershell(monkeypatch):
     assert history._parent_shell_hint() == "bash"
     monkeypatch.delenv("SHELL")
     assert history._parent_shell_hint() == "powershell"
+
+
+def zsh_metafy(text: str) -> bytes:
+    # What zsh does when it writes history: bytes 0x83-0xa2 become 0x83, byte ^ 0x20.
+    out = bytearray()
+    for b in text.encode("utf-8"):
+        if 0x83 <= b <= 0xA2:
+            out += bytes([0x83, b ^ 0x20])
+        else:
+            out.append(b)
+    return bytes(out)
+
+
+def test_zsh_non_ascii_is_unmetafied(tmp_path):
+    from histpick import history
+
+    f = tmp_path / ".zsh_history"
+    f.write_bytes(zsh_metafy(": 1700000000:0;echo é à 日本\n: 1700000001:0;ls\n"))
+    assert history.read(history.Shell("zsh", ".sh", f)) == ["echo é à 日本", "ls"]

@@ -65,7 +65,10 @@ def _parent_shell_hint() -> str | None:
 
 
 def read(shell: Shell) -> list[str]:
-    raw = shell.path.read_bytes().decode("utf-8", errors="replace")
+    data = shell.path.read_bytes()
+    if shell.name == "zsh":
+        data = unmetafy(data)
+    raw = data.decode("utf-8", errors="replace")
     parser = {"powershell": parse_powershell, "bash": parse_bash, "zsh": parse_zsh, "fish": parse_fish}
     return parser[shell.name](raw)
 
@@ -94,6 +97,17 @@ def parse_bash(text: str) -> list[str]:
         if line.strip():
             out.append(line)
     return out
+
+
+def unmetafy(data: bytes) -> bytes:
+    """Undo zsh's escaping: it writes some bytes as 0x83 followed by the byte XOR 0x20."""
+    first, *rest = data.split(b"\x83")
+    out = bytearray(first)
+    for part in rest:
+        if part:
+            out.append(part[0] ^ 0x20)
+            out += part[1:]
+    return bytes(out)
 
 
 _ZSH_EXTENDED = re.compile(r"^: \d+:\d+;(.*)$")
