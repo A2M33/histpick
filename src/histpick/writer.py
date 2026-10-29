@@ -50,4 +50,6 @@ def save(text: str, path: Path, shell: str, force: bool = False) -> Path:
 
 def is_own_command(cmd: str) -> bool:
     first = cmd.strip().split(maxsplit=1)[0] if cmd.strip() else ""
-    return os.path.splitext(os.path.basename(first))[0].lower() == "histpick"
+    # Split on both kinds of slash: a PowerShell history read on Linux still has C:\ paths.
+    name = first.replace("\\", "/").rsplit("/", 1)[-1]
+    return os.path.splitext(name)[0].lower() == "histpick"
