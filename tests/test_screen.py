@@ -69,8 +69,9 @@ def test_highlight_fills_the_row(monkeypatch, capsys):
     assert cells(ANSI.sub("", row)) == 49
 
 
-def test_help_keeps_esc_on_screen_in_an_80_column_terminal(monkeypatch, capsys):
-    last = frame(picker._draw, PickerState(["ls"]), 80, 24, monkeypatch, capsys)[-1]
+@pytest.mark.parametrize("cols", [80, 60, 50])
+def test_help_keeps_esc_on_screen(cols, monkeypatch, capsys):
+    last = frame(picker._draw, PickerState(["ls"]), cols, 24, monkeypatch, capsys)[-1]
     assert "esc cancel" in last and "…" not in last
 
 

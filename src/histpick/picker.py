@@ -362,8 +362,10 @@ def _row(marks: str, plain_marks: str, text: str, selected: bool, cols: int) -> 
     return f"\x1b[7m{row}{' ' * (cols - 1 - cells(row))}\x1b[0m"
 
 
-def _help(full: str, short: str, cols: int) -> str:
-    return "\x1b[2m" + fit(full if cells(full) < cols else short, cols - 1) + "\x1b[0m"
+def _help(cols: int, *versions: str) -> str:
+    """The longest version of the help line that fits."""
+    text = next((v for v in versions if cells(v) < cols), versions[-1])
+    return "\x1b[2m" + fit(text, cols - 1) + "\x1b[0m"
 
 
 def _paint(lines: list[str]) -> None:
@@ -392,8 +394,10 @@ def _draw(s: PickerState, title: str) -> None:
         plain = f" {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} "
         lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor, cols))
     _paint(lines + pane + [_help(
+        cols,
         "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel",
-        "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen  enter review  esc cancel", cols)])
+        "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen  enter review  esc cancel",
+        "↑↓ move  tab choose  enter review  esc cancel")])
 
 
 def _draw_review(r: ReviewState, title: str) -> None:
@@ -419,8 +423,8 @@ def _draw_review(r: ReviewState, title: str) -> None:
         marks = f" {i + 1:>{width}} {secret_mark() if secret else ' '} "
         plain = f" {i + 1:>{width}} {'!' if secret else ' '} "
         lines.append(_row(marks, plain, one_line(cmd, cols - width - 5), i == r.cursor, cols))
-    _paint(lines + pane + [_help("↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back",
-                                 "↑↓ select  u/d reorder  x remove  enter save  esc back", cols)])
+    _paint(lines + pane + [_help(cols, "↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back",
+                                 "↑↓ select  u/d reorder  x remove  enter save  esc back")])
 
 
 def _review_key(r: ReviewState, k: str, page: int) -> None:
