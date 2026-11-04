@@ -122,6 +122,15 @@ def test_random_bytes_are_not_a_crash(ps_history, capsys):
     assert main(["--shell", "powershell", "--list"]) == 0
 
 
+def test_unreadable_history_is_a_clean_error(ps_history, monkeypatch, capsys):
+    def denied(shell):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(history, "read", denied)
+    assert main(["--shell", "powershell", "--list"]) == 1
+    assert capsys.readouterr().err.startswith("Can't read ")
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

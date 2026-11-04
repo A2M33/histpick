@@ -151,7 +151,11 @@ def _main(argv: list[str] | None) -> int:
         print(f"No shell history found in {where}. Try --shell.", file=sys.stderr)
         return 1
 
-    commands = [c for c in history.read(shell) if not writer.is_own_command(c)]
+    try:
+        commands = [c for c in history.read(shell) if not writer.is_own_command(c)]
+    except OSError as e:
+        print(f"Can't read {shell.path}: {e.strerror or e}", file=sys.stderr)
+        return 1
     if not commands:
         print(f"{shell.path} has no commands in it.", file=sys.stderr)
         if shell.name == "bash":
