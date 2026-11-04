@@ -79,13 +79,21 @@ def _parent_shell_hint() -> str | None:
     return None
 
 
+def decode(data: bytes) -> str:
+    """History files are UTF-8, but a BOM or UTF-16 slips in when an editor or `>` rewrites one."""
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = data.decode("utf-16", errors="replace")
+    else:
+        text = data.decode("utf-8-sig", errors="replace")
+    return text.replace("\x00", "")  # a crash can leave runs of NUL bytes in the file
+
+
 def read(shell: Shell) -> list[str]:
     data = shell.path.read_bytes()
     if shell.name == "zsh":
         data = unmetafy(data)
-    raw = data.decode("utf-8", errors="replace")
     parser = {"powershell": parse_powershell, "bash": parse_bash, "zsh": parse_zsh, "fish": parse_fish}
-    return parser[shell.name](raw)
+    return parser[shell.name](decode(data))
 
 
 def parse_powershell(text: str) -> list[str]:

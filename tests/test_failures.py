@@ -107,6 +107,21 @@ def test_powershell_folder_is_lowercase_on_linux_and_macos(tmp_path, monkeypatch
     assert history.powershell_path() == tmp_path / "powershell" / "PSReadLine" / "ConsoleHost_history.txt"
 
 
+@pytest.mark.parametrize("data", [
+    b"\xef\xbb\xbfgit status\nls\n",                  # UTF-8 with a BOM
+    "git status\nls\n".encode("utf-16"),              # what `>` writes in Windows PowerShell 5.1
+    b"git status\n\x00\x00\x00\x00\nls\n\x00\x00",   # NUL bytes after a crash
+])
+def test_odd_encodings_give_clean_commands(data, ps_history):
+    ps_history.write_bytes(data)
+    assert history.read(history.Shell("powershell", ".ps1", ps_history)) == ["git status", "ls"]
+
+
+def test_random_bytes_are_not_a_crash(ps_history, capsys):
+    ps_history.write_bytes(bytes(range(256)) * 20)
+    assert main(["--shell", "powershell", "--list"]) == 0
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0
