@@ -179,6 +179,23 @@ def test_existing_output_stops_before_the_picker_opens(ps_history, tmp_path, mon
     assert (tmp_path / "setup.ps1").read_text(encoding="utf-8") == "keep me"
 
 
+def test_escape_sequences_from_history_are_shown_not_run(ps_history, capsys):
+    ps_history.write_text('printf "\x1b[2J\x07"\necho "\x1b]0;token\x07"\n', encoding="utf-8")
+    assert main(["--shell", "powershell", "--list"]) == 0
+    assert '^[[2J^G' in capsys.readouterr().out
+    assert main(["--shell", "powershell", "--last", "1", "--print"]) == 0
+    captured = capsys.readouterr()
+    assert "\x1b" not in captured.err  # the secret warning shows the command too
+    assert '"\x1b]0;token\x07"' in captured.out  # the script keeps the command as it was
+
+
+def test_picker_shows_control_characters_safely():
+    from histpick.picker import one_line, preview
+
+    assert one_line("a\x1b[31mb\tc", 40) == "a^[[31mb    c"
+    assert preview("one\ntwo\x1b[K", 40, 5) == ["one", "two^[[K"]
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

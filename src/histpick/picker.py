@@ -12,6 +12,7 @@ import sys
 from dataclasses import dataclass, field
 
 from .history import looks_secret
+from .text import printable
 
 SECRET_MARK = "\x1b[33m!\x1b[0m"  # beside commands that may contain a password or token
 
@@ -159,7 +160,7 @@ def _scroll(s, height: int) -> None:
 
 def one_line(cmd: str, width: int) -> str:
     lines = cmd.split("\n")
-    text = lines[0]
+    text = printable(lines[0])
     if len(lines) > 1:
         text += f"  (+{len(lines) - 1} lines)"
     return text if len(text) <= width else text[: max(0, width - 1)] + "…"
@@ -291,7 +292,7 @@ def _enable_ansi() -> None:
 
 def preview(cmd: str | None, width: int, max_rows: int) -> list[str]:
     """All lines of a multi-line command, cut to fit; nothing for a one-line command."""
-    lines = (cmd or "").split("\n")
+    lines = [printable(ln) for ln in (cmd or "").split("\n")]
     if len(lines) <= 1:
         return []
     if len(lines) > max_rows:

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from . import __version__, history, writer
 from .picker import pick
+from .text import printable
 
 
 def parse_numbers(text: str, count: int) -> list[int]:
@@ -189,7 +190,7 @@ def _main(argv: list[str] | None) -> int:
         for n, c in enumerate(items, 1):
             first, *rest = c.split("\n")
             more = f"  (+{len(rest)} lines)" if rest else ""
-            print(f"{n:>{width}} {'!' if history.looks_secret(c) else ' '} {first}{more}")
+            print(f"{n:>{width}} {'!' if history.looks_secret(c) else ' '} {printable(first)}{more}")
         if any(history.looks_secret(c) for c in items):
             print("! = may contain a password or token", file=sys.stderr)
         return 0
@@ -234,7 +235,8 @@ def _main(argv: list[str] | None) -> int:
         print(f"Warning: {len(secrets)} of the chosen commands may contain a password or token. "
               "Check the script before you share it:", file=sys.stderr)
         for c in secrets:
-            print(f"  ! {c.split(chr(10))[0]}", file=sys.stderr)
+            first = c.split("\n", 1)[0]
+            print(f"  ! {printable(first)}", file=sys.stderr)
 
     text = writer.render(chosen, shell.name)
     if args.print:
