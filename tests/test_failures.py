@@ -64,6 +64,24 @@ def test_printed_script_keeps_non_english_text_in_a_pipe(tmp_path):
     assert "سلام دنیا" in out.decode("utf-8")
 
 
+def test_reader_that_leaves_early_is_not_an_error(tmp_path):
+    p = histpick_process(tmp_path, "--list")
+    p.stdout.close()  # what `histpick --list | more` does when you quit more
+    err = p.stderr.read()
+    p.stderr.close()
+    assert p.wait(timeout=60) == 0, err
+    assert err == b""
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0
+
+
+def test_ctrl_c_exits_with_130(ps_history, monkeypatch, capsys):
+    def interrupted(shell):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(history, "read", interrupted)
+    assert main(["--shell", "powershell", "--list"]) == 130
+    assert capsys.readouterr().err.strip() == "Cancelled."

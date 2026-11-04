@@ -44,7 +44,17 @@ def positive(text: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     _fix_streams()
     try:
-        return _main(argv)
+        code = _main(argv)
+        sys.stdout.flush()
+        return code
+    except KeyboardInterrupt:
+        print("Cancelled.", file=sys.stderr)
+        return 130
+    except OSError as e:
+        if _reader_left():
+            return 0
+        print(f"histpick: error: {e}", file=sys.stderr)
+        return 1
     finally:
         _pause_if_double_clicked()
 
@@ -63,6 +73,17 @@ def _fix_streams() -> None:
             stream.reconfigure(encoding="utf-8", errors="replace")
         else:
             stream.reconfigure(errors="replace")
+
+
+def _reader_left() -> bool:
+    """True if nothing reads our output any more, as after `histpick --list | more` and q."""
+    try:
+        sys.stdout.flush()
+        return False
+    except OSError:  # BrokenPipeError on Unix, EINVAL on Windows
+        # Python flushes stdout again on exit and would print this same error.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return True
 
 
 def _console_process_count() -> int:
