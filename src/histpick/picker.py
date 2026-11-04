@@ -177,21 +177,37 @@ CTRL_O, CTRL_U, CTRL_C, LEFT, RIGHT, DELETE = "ctrl-o", "ctrl-u", "ctrl-c", "lef
 # Space is an ordinary character so it can go into the filter; Tab chooses.
 _CHARS = {"\r": ENTER, "\n": ENTER, "\x1b": ESC, "\x08": BACKSPACE, "\x7f": BACKSPACE,
           "\t": TAB, "\x01": CTRL_A, "\x0f": CTRL_O, "\x15": CTRL_U, "\x03": CTRL_C}
-_WIN_SPECIAL = {"H": UP, "P": DOWN, "I": PGUP, "Q": PGDN, "G": HOME, "O": END, "K": LEFT, "M": RIGHT,
-                "S": DELETE, "\x8d": MOVE_UP, "\x91": MOVE_DOWN, "\x98": MOVE_UP, "\xa0": MOVE_DOWN}
+_WIN_KEYS = {0x26: UP, 0x28: DOWN, 0x21: PGUP, 0x22: PGDN, 0x24: HOME, 0x23: END, 0x25: LEFT, 0x27: RIGHT,
+             0x2E: DELETE}  # virtual key codes
+_WIN_ALT_CTRL_SHIFT = 0x1F
 _CSI_LETTERS = {"A": UP, "B": DOWN, "C": RIGHT, "D": LEFT, "H": HOME, "F": END}
 _CSI_MODIFIED = {"A": MOVE_UP, "B": MOVE_DOWN}
 _CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN, "3": DELETE}
 
 
+def windows_key(vk: int, char: str, modifiers: int) -> str:
+    """Name a key press from the Windows console: a key name, a typed character, or ""."""
+    if char != "\0":
+        return _CHARS.get(char, char)
+    key = _WIN_KEYS.get(vk, "")
+    if key in (UP, DOWN) and modifiers & _WIN_ALT_CTRL_SHIFT:
+        return MOVE_UP if key == UP else MOVE_DOWN
+    return key
+
+
 class _Keys:
-    """Raw single-key input on Windows (msvcrt) and Unix (termios)."""
+    """Raw single-key input on Windows (console events) and Unix (termios)."""
 
     def __init__(self, fd: int | None = None):
         self._fd = fd
 
     def __enter__(self):
-        if sys.platform != "win32":
+        if sys.platform == "win32":
+            from .winkeys import ConsoleKeys
+
+            self._console = ConsoleKeys()
+            self._console.open()
+        else:
             import termios
             import tty
 
@@ -202,19 +218,19 @@ class _Keys:
         return self
 
     def __exit__(self, *exc):
-        if sys.platform != "win32":
+        if sys.platform == "win32":
+            self._console.close()
+        else:
             import termios
 
             termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old)
 
     def read(self) -> str:
         if sys.platform == "win32":
-            import msvcrt
-
-            ch = msvcrt.getwch()
-            if ch in ("\x00", "\xe0"):  # arrows and other special keys come in two parts
-                return _WIN_SPECIAL.get(msvcrt.getwch(), "")
-            return _CHARS.get(ch, ch)
+            key = ""
+            while not key:  # Shift or Ctrl on its own is an event too
+                key = windows_key(*self._console.next_key())
+            return key
         return self._read_posix()
 
     # Read the file descriptor directly. sys.stdin.read(1) pulls the whole escape

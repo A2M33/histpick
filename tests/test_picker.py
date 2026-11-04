@@ -150,6 +150,24 @@ def test_removing_in_review_keeps_the_chosen_only_cursor_in_range(monkeypatch):
     assert run_pick(monkeypatch, ["a", "b", "c"], keys) == ["a"]
 
 
+def test_windows_key_events():
+    from histpick import picker
+    from histpick.picker import windows_key
+
+    up, down, delete, shift_key = 0x26, 0x28, 0x2E, 0x10
+    left_ctrl, shift, numlock, enhanced = 0x08, 0x10, 0x20, 0x100
+    assert windows_key(0, "à", 0) == "à"  # getwch() gives 0xE0 for this and for arrows alike
+    assert windows_key(0x51, "ق", 0) == "ق"
+    assert windows_key(up, "\0", enhanced) == picker.UP
+    assert windows_key(up, "\0", enhanced | numlock) == picker.UP
+    assert windows_key(up, "\0", enhanced | left_ctrl) == picker.MOVE_UP
+    assert windows_key(down, "\0", enhanced | shift) == picker.MOVE_DOWN
+    assert windows_key(delete, "\0", enhanced) == picker.DELETE
+    assert windows_key(0x43, "\x03", left_ctrl) == picker.CTRL_C
+    assert windows_key(0x0D, "\r", 0) == picker.ENTER
+    assert windows_key(shift_key, "\0", shift) == ""
+
+
 def test_chosen_only_view():
     s = state()
     s.toggle()  # git push
