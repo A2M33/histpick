@@ -12,9 +12,12 @@ import sys
 from dataclasses import dataclass, field
 
 from .history import looks_secret
-from .text import printable
+from .text import cells, fit, printable
 
 SECRET_MARK = "\x1b[33m!\x1b[0m"  # beside commands that may contain a password or token
+CHOSEN_MARK = "\x1b[32m[x]\x1b[0m"
+LEGEND = f"  {SECRET_MARK} \x1b[2mmay contain a password or token\x1b[0m"
+LEGEND_COLUMNS = 35
 
 # ---------- logic ----------
 
@@ -159,11 +162,11 @@ def _scroll(s, height: int) -> None:
 
 
 def one_line(cmd: str, width: int) -> str:
-    lines = cmd.split("\n")
-    text = printable(lines[0])
-    if len(lines) > 1:
-        text += f"  (+{len(lines) - 1} lines)"
-    return text if len(text) <= width else text[: max(0, width - 1)] + "…"
+    first, *rest = cmd.split("\n")
+    more = f"  (+{len(rest)} lines)" if rest else ""
+    if width < cells(more) + 4:  # no room to say both
+        more = ""
+    return fit(printable(first), width - cells(more)) + more
 
 
 # ---------- keys ----------
@@ -297,87 +300,105 @@ def preview(cmd: str | None, width: int, max_rows: int) -> list[str]:
         return []
     if len(lines) > max_rows:
         lines = lines[: max_rows - 1] + [f"… (+{len(lines) - max_rows + 1} more lines)"]
-    return [ln if len(ln) <= width else ln[: max(0, width - 1)] + "…" for ln in lines]
-
-
-def _fit(text: str, cols: int) -> str:
-    return text if len(text) < cols else text[: max(0, cols - 2)] + "…"
+    return [fit(ln, width) for ln in lines]
 
 
 def _preview_rows(cmd: str | None, cols: int, rows: int) -> list[str]:
-    lines = preview(cmd, cols - 4, max(2, rows // 3))
+    if rows < 8:  # a window this short needs every row for the list
+        return []
+    lines = preview(cmd, cols - 3, max(2, rows // 3))
     if not lines:
         return []
-    return ["\x1b[2m" + "─" * (cols - 1) + "\x1b[0m\r\n"] + [f"  {ln}\r\n" for ln in lines]
+    return ["\x1b[2m" + "─" * (cols - 1) + "\x1b[0m"] + [f"  {ln}" for ln in lines]
+
+
+def _heading(title: str, detail: str, flagged: bool, cols: int) -> str:
+    """The title, then as much of the rest as the row has room for."""
+    room = cols - 1
+    title = fit(title, room)
+    room -= cells(title)
+    line = f"\x1b[1m{title}\x1b[0m"
+    if room >= 8:
+        detail = fit("  " + detail, room)
+        room -= cells(detail)
+        line += f"\x1b[2m{detail}\x1b[0m"
+    if flagged and room >= LEGEND_COLUMNS:
+        line += LEGEND
+    return line
+
+
+def _filter_line(query: str, pos: int, cols: int) -> str:
+    label = "filter: "
+    room = max(1, cols - 2 - len(label))  # one column stays free for the text cursor
+    start = 0
+    while cells(query[start:pos]) > room:  # a long filter scrolls to keep the cursor in view
+        start += 1
+    before = query[start:pos]
+    under = query[pos] if pos < len(query) else " "
+    caret = f"\x1b[7m{under}\x1b[0m"  # the terminal's cursor is hidden, so draw one
+    after = fit(query[pos + 1:], room - cells(before))
+    hint = "" if query else "\x1b[2m" + fit("(type to filter, words in any order)", room) + "\x1b[0m"
+    return f"{label}{before}{caret}{after}{hint}"
+
+
+def _row(marks: str, plain_marks: str, text: str, selected: bool) -> str:
+    # The selected row uses plain marks: a colour reset inside would end the highlight.
+    return f"\x1b[7m{plain_marks}{text}\x1b[0m" if selected else f"{marks}{text}"
+
+
+def _paint(lines: list[str]) -> None:
+    sys.stdout.write("\x1b[H\x1b[2J" + "\r\n".join(lines))
+    sys.stdout.flush()
 
 
 def _draw(s: PickerState, title: str) -> None:
     cols, rows = shutil.get_terminal_size((100, 30))
     pane = _preview_rows(s.current(), cols, rows)
-    height = max(3, rows - 4 - len(pane))
+    height = max(1, rows - 3 - len(pane))
     s.scroll(height)
     vis = s.visible()
     view = "  showing chosen only" if s.only_chosen else ""
     flagged = any(looks_secret(s.items[j]) for j in vis[s.top: s.top + height])
-    legend = f"  {SECRET_MARK} \x1b[2mmay contain a password or token\x1b[0m" if flagged else ""
-    out = ["\x1b[H\x1b[2J"]
-    out.append(f"\x1b[1m{title}\x1b[0m  \x1b[2m{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}\x1b[0m"
-               f"{legend}\r\n")
-    q, p = s.query, s.pos
-    caret = f"\x1b[7m{q[p] if p < len(q) else ' '}\x1b[0m"  # the cursor is hidden, so draw one
-    hint = "" if q else "\x1b[2m(type to filter, words in any order)\x1b[0m"
-    out.append(f"filter: {q[:p]}{caret}{q[p + 1:]}{hint}\r\n")
-    for row in range(height):
-        i = s.top + row
+    lines = [_heading(title, f"{len(vis)}/{len(s.items)}  {len(s.chosen)} chosen{view}", flagged, cols),
+             _filter_line(s.query, s.pos, cols)]
+    for i in range(s.top, s.top + height):
         if i >= len(vis):
-            out.append("\r\n")
+            lines.append("")
             continue
-        idx = vis[i]
-        chosen, secret = idx in s.chosen, looks_secret(s.items[idx])
-        text = one_line(s.items[idx], cols - 9)
-        if i == s.cursor:  # plain marks: a color reset inside would end the highlight
-            out.append(f"\x1b[7m {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} {text}\x1b[0m\r\n")
-        else:
-            mark = "\x1b[32m[x]\x1b[0m" if chosen else "[ ]"
-            out.append(f" {mark} {SECRET_MARK if secret else ' '} {text}\r\n")
-    out += pane
+        cmd = s.items[vis[i]]
+        chosen, secret = vis[i] in s.chosen, looks_secret(cmd)
+        marks = f" {CHOSEN_MARK if chosen else '[ ]'} {SECRET_MARK if secret else ' '} "
+        plain = f" {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} "
+        lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor))
     help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel"
-    out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
-    sys.stdout.write("".join(out))
-    sys.stdout.flush()
+    _paint(lines + pane + [f"\x1b[2m{fit(help_, cols - 1)}\x1b[0m"])
 
 
 def _draw_review(r: ReviewState, title: str) -> None:
     cols, rows = shutil.get_terminal_size((100, 30))
     pane = _preview_rows(r.items[r.order[r.cursor]] if r.order else None, cols, rows)
-    height = max(3, rows - 4 - len(pane))
+    height = max(1, rows - 3 - len(pane))
     r.scroll(height)
     n = len(r.order)
     width = len(str(n))
-    out = ["\x1b[H\x1b[2J"]
-    out.append(f"\x1b[1m{title}: review\x1b[0m  \x1b[2m{n} command{'s' if n != 1 else ''}\x1b[0m\r\n")
+    lines = [_heading(f"{title}: review", f"{n} command{'s' if n != 1 else ''}", False, cols)]
     secrets = sum(looks_secret(c) for c in r.result())
     if secrets:
-        out.append(f"{SECRET_MARK} \x1b[33m{secrets} of these may contain a password or token. "
-                   "Check the script before you share it.\x1b[0m\r\n")
+        warning = f"{secrets} of these may contain a password or token. Check the script before you share it."
+        lines.append(f"{SECRET_MARK} \x1b[33m{fit(warning, cols - 3)}\x1b[0m")
     else:
-        out.append("\x1b[2mThe script runs these from top to bottom.\x1b[0m\r\n")
-    for row in range(height):
-        i = r.top + row
+        lines.append("\x1b[2m" + fit("The script runs these from top to bottom.", cols - 1) + "\x1b[0m")
+    for i in range(r.top, r.top + height):
         if i >= n:
-            out.append("\r\n")
+            lines.append("")
             continue
         cmd = r.items[r.order[i]]
-        text = one_line(cmd, cols - width - 6)
-        if i == r.cursor:
-            out.append(f"\x1b[7m {i + 1:>{width}} {'!' if looks_secret(cmd) else ' '} {text}\x1b[0m\r\n")
-        else:
-            out.append(f" {i + 1:>{width}} {SECRET_MARK if looks_secret(cmd) else ' '} {text}\r\n")
-    out += pane
+        secret = looks_secret(cmd)
+        marks = f" {i + 1:>{width}} {SECRET_MARK if secret else ' '} "
+        plain = f" {i + 1:>{width}} {'!' if secret else ' '} "
+        lines.append(_row(marks, plain, one_line(cmd, cols - width - 5), i == r.cursor))
     help_ = "↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back"
-    out.append(f"\x1b[2m{_fit(help_, cols)}\x1b[0m")
-    sys.stdout.write("".join(out))
-    sys.stdout.flush()
+    _paint(lines + pane + [f"\x1b[2m{fit(help_, cols - 1)}\x1b[0m"])
 
 
 def _review_key(r: ReviewState, k: str, page: int) -> None:
