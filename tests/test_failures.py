@@ -156,6 +156,13 @@ def test_last_can_reach_past_the_default_limit(ps_history, capsys):
     assert capsys.readouterr().out.count("\necho ") == 350
 
 
+def test_dumb_terminal_explains_itself(ps_history, monkeypatch, capsys):
+    monkeypatch.setenv("TERM", "dumb")
+    monkeypatch.setattr(cli, "_is_terminal", lambda stream: True)
+    assert main(["--shell", "powershell"]) == 2
+    assert "can't show the picker" in capsys.readouterr().err
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

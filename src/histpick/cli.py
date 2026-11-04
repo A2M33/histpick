@@ -194,7 +194,11 @@ def _main(argv: list[str] | None) -> int:
             print("The picker needs a terminal. Run --list to see the numbers, then use --pick, or use --last.",
                   file=sys.stderr)
             return 2
-        chosen = pick(items, title=f"histpick: {shell.name} history")
+        try:
+            chosen = pick(items, title=f"histpick: {shell.name} history")
+        except RuntimeError as e:  # a terminal too limited to draw on
+            print(f"histpick: {e}", file=sys.stderr)
+            return 2
         if chosen is None:
             print("Cancelled.")
             return 1
