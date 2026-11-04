@@ -163,6 +163,22 @@ def test_dumb_terminal_explains_itself(ps_history, monkeypatch, capsys):
     assert "can't show the picker" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("output", [".", "..", "afolder"])
+def test_output_that_is_a_folder_is_a_clean_error(output, ps_history, tmp_path, capsys):
+    (tmp_path / "afolder").mkdir()
+    assert main(["--shell", "powershell", "--last", "1", "-o", output]) == 2
+    assert "is a folder" in capsys.readouterr().err
+
+
+def test_existing_output_stops_before_the_picker_opens(ps_history, tmp_path, monkeypatch, capsys):
+    (tmp_path / "setup.ps1").write_text("keep me", encoding="utf-8")
+    monkeypatch.setattr(cli, "_is_terminal", lambda stream: True)
+    monkeypatch.setattr(cli, "pick", lambda *a, **kw: pytest.fail("the picker must not open"))
+    assert main(["--shell", "powershell", "-o", "setup"]) == 2
+    assert "already exists" in capsys.readouterr().err
+    assert (tmp_path / "setup.ps1").read_text(encoding="utf-8") == "keep me"
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

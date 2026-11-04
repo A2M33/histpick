@@ -124,6 +124,20 @@ def run_hint(path: Path, shell: str, platform: str = sys.platform) -> str:
     return f"{shell} {shlex.quote(str(path))}"
 
 
+def output_path(output: str | None, ext: str) -> Path:
+    """The file to write: -o with the script's extension added, or a dated default name."""
+    path = Path(output) if output else Path(writer.default_name(ext))
+    return path if path.suffix or path.is_dir() else path.with_suffix(ext)
+
+
+def _output_problem(path: Path, force: bool) -> str | None:
+    if path.is_dir():
+        return f"{path} is a folder. Give a file name, like {path / 'setup'}"
+    if path.exists() and not force:
+        return f"{path} already exists (use --force to overwrite)"
+    return None
+
+
 def _main(argv: list[str] | None) -> int:
     p = argparse.ArgumentParser(
         prog="histpick",
@@ -180,6 +194,14 @@ def _main(argv: list[str] | None) -> int:
             print("! = may contain a password or token", file=sys.stderr)
         return 0
 
+    path = None
+    if not args.print:  # checked now, so a bad -o doesn't cost you the commands you picked
+        path = output_path(args.output, shell.ext)
+        problem = _output_problem(path, args.force)
+        if problem:
+            print(problem, file=sys.stderr)
+            return 2
+
     if args.last:
         chosen = list(reversed(items[: args.last]))
     elif args.pick is not None:  # --pick "" chooses nothing, it doesn't open the picker
@@ -218,9 +240,6 @@ def _main(argv: list[str] | None) -> int:
     if args.print:
         sys.stdout.write(text)
         return 0
-    path = Path(args.output) if args.output else Path(writer.default_name(shell.ext))
-    if not path.suffix:
-        path = path.with_suffix(shell.ext)
     try:
         writer.save(text, path, shell.name, args.force)
     except FileExistsError as e:
