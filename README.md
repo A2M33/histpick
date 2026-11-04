@@ -92,7 +92,7 @@ Read the script before you run it: your history may contain one-off commands, pa
 
 | Shell | File | Note |
 | --- | --- | --- |
-| PowerShell | `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt` | Saved after every command |
+| PowerShell | `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt`, or `~/.local/share/powershell/PSReadLine/ConsoleHost_history.txt` on Linux and macOS | Saved after every command |
 | bash | `~/.bash_history` (or `$HISTFILE`) | bash writes it when the shell exits; run `history -a` first to include the current session |
 | zsh | `~/.zsh_history` | Plain and extended formats |
 | fish | `~/.local/share/fish/fish_history` | |
