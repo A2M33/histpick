@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -41,10 +42,27 @@ def positive(text: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _fix_streams()
     try:
         return _main(argv)
     finally:
         _pause_if_double_clicked()
+
+
+def _fix_streams() -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name)
+        if stream is None:  # started with the stream closed, like `histpick --list >&-`
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+            continue
+        if not hasattr(stream, "reconfigure"):
+            continue
+        # A script redirected with --print > setup.ps1 has to keep its non-English text, so
+        # pipes and files get UTF-8. PYTHONIOENCODING still wins if it's set.
+        if not stream.isatty() and not os.environ.get("PYTHONIOENCODING"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        else:
+            stream.reconfigure(errors="replace")
 
 
 def _console_process_count() -> int:
@@ -86,9 +104,6 @@ def run_hint(path: Path, shell: str, platform: str = sys.platform) -> str:
 
 
 def _main(argv: list[str] | None) -> int:
-    if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-        sys.stdout.reconfigure(errors="replace")
-
     p = argparse.ArgumentParser(
         prog="histpick",
         description="Pick commands from your shell history and save them as a script.",
@@ -149,8 +164,9 @@ def _main(argv: list[str] | None) -> int:
             return 2
         chosen = [items[i] for i in idx]
     else:
-        if not sys.stdin.isatty() or not sys.stdout.isatty():
-            print("Not a terminal. Use --list with --pick, or --last.", file=sys.stderr)
+        if not _is_terminal(sys.stdin) or not _is_terminal(sys.stdout):
+            print("The picker needs a terminal. Run --list to see the numbers, then use --pick, or use --last.",
+                  file=sys.stderr)
             return 2
         chosen = pick(items, title=f"histpick: {shell.name} history")
         if chosen is None:

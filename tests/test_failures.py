@@ -23,6 +23,18 @@ def ps_history(tmp_path, monkeypatch):
     return f
 
 
+def histpick_process(tmp_path, *args, **popen):
+    """The real CLI in its own process, reading a PowerShell history from `tmp_path`."""
+    folder = tmp_path / "Microsoft" / "Windows" / "PowerShell"
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
+    env.update(PYTHONPATH=SRC, APPDATA=str(tmp_path), XDG_DATA_HOME=str(tmp_path))
+    hist = (folder if sys.platform == "win32" else tmp_path / "powershell") / "PSReadLine"
+    hist.mkdir(parents=True, exist_ok=True)
+    (hist / "ConsoleHost_history.txt").write_text("git status\necho سلام دنیا\n", encoding="utf-8")
+    return subprocess.Popen([sys.executable, "-m", "histpick", "--shell", "powershell", *args], env=env,
+                            cwd=tmp_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **popen)
+
+
 @pytest.mark.parametrize("processes, clicked", [
     (2, True),    # double-clicked: the onefile stub and Python
     (3, False),   # typed in a terminal: the shell as well
@@ -43,3 +55,15 @@ def test_pause_survives_closed_stdin_and_ctrl_c(error, monkeypatch):
     monkeypatch.setattr(cli, "_double_clicked", lambda: True)
     monkeypatch.setattr("builtins.input", interrupted)
     cli._pause_if_double_clicked()
+
+
+def test_printed_script_keeps_non_english_text_in_a_pipe(tmp_path):
+    p = histpick_process(tmp_path, "--last", "1", "--print")
+    out, err = p.communicate(timeout=60)
+    assert p.returncode == 0, err
+    assert "سلام دنیا" in out.decode("utf-8")
+
+
+def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
+    monkeypatch.setattr(sys, "stdout", None)
+    assert main(["--shell", "powershell", "--list"]) == 0
