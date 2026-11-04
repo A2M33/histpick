@@ -143,6 +143,13 @@ def test_pick_goes_through_review(monkeypatch, capsys):
     assert "review" in capsys.readouterr().out
 
 
+def test_removing_in_review_keeps_the_chosen_only_cursor_in_range(monkeypatch):
+    from histpick.picker import CTRL_O, DOWN, ENTER, ESC, TAB
+
+    keys = [TAB, TAB, TAB, CTRL_O, DOWN, DOWN, ENTER, "x", ESC, TAB, ENTER, ENTER]
+    assert run_pick(monkeypatch, ["a", "b", "c"], keys) == ["a"]
+
+
 def test_chosen_only_view():
     s = state()
     s.toggle()  # git push

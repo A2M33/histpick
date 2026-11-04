@@ -114,6 +114,7 @@ class PickerState:
     def back_from(self, review: ReviewState) -> None:
         self.order = list(review.order)
         self.chosen = set(review.order)
+        self.move(0)  # the chosen-only view may have just got shorter
 
 
 @dataclass
