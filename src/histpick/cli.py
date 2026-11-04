@@ -21,13 +21,13 @@ def parse_numbers(text: str, count: int) -> list[int]:
     out: list[int] = []
     for part in text.replace(",", " ").split():
         a, dash, b = part.partition("-")
-        if not a.isdigit() or (dash and not b.isdigit()):
+        if not a.isdecimal() or (dash and not b.isdecimal()):
             raise ValueError(f'"{part}" is not a number or a range like 3-5')
         a, b = int(a), int(b or a)
+        for n in (a, b):  # before building the range: 1-999999999999 would fill the memory
+            if not 1 <= n <= count:
+                raise ValueError(f"no command number {n} (there are {count})")
         out.extend(range(a, b + 1) if a <= b else range(a, b - 1, -1))
-    bad = [n for n in out if not 1 <= n <= count]
-    if bad:
-        raise ValueError(f"no command number {bad[0]} (there are {count})")
     return [n - 1 for n in dict.fromkeys(out)]
 
 

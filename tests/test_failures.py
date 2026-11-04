@@ -131,6 +131,13 @@ def test_unreadable_history_is_a_clean_error(ps_history, monkeypatch, capsys):
     assert capsys.readouterr().err.startswith("Can't read ")
 
 
+def test_huge_range_is_refused_at_once():
+    with pytest.raises(ValueError, match="no command number 999999999999"):
+        cli.parse_numbers("1-999999999999", 10)
+    with pytest.raises(ValueError, match="not a number"):
+        cli.parse_numbers("²", 10)  # a digit to str.isdigit, but int() can't read it
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0
