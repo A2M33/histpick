@@ -163,7 +163,7 @@ def _scroll(s, height: int) -> None:
 
 def one_line(cmd: str, width: int) -> str:
     first, *rest = cmd.split("\n")
-    more = f"  (+{len(rest)} lines)" if rest else ""
+    more = f"  (+{len(rest)} line{'s' if len(rest) > 1 else ''})" if rest else ""
     if width < cells(more) + 4:  # no room to say both
         more = ""
     return fit(printable(first), width - cells(more)) + more

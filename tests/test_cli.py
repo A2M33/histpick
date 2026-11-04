@@ -28,7 +28,7 @@ def test_list_shows_newest_first_without_own_calls(ps_history, capsys):
     assert main(["--shell", "powershell", "--list"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].endswith("git config --global user.name Amin")
-    assert "Get-ChildItem |  (+1 lines)" in lines[1]
+    assert "Get-ChildItem |  (+1 line)" in lines[1]
     assert not any("histpick" in line for line in lines)
 
 

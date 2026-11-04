@@ -68,6 +68,21 @@ def test_one_line_keeps_the_line_count_of_a_long_command():
     assert cells(one_line("x" * 100 + "\ny", 5)) <= 5
 
 
+def test_list_cuts_long_commands_only_in_a_terminal(tmp_path, monkeypatch, capsys):
+    from histpick import cli
+
+    history_file = tmp_path / "history.txt"
+    history_file.write_text("x" * 300 + "\n", encoding="utf-8")
+    monkeypatch.setattr(cli.history, "powershell_path", lambda: history_file)
+    assert cli.main(["--shell", "powershell", "--list"]) == 0
+    assert "x" * 300 in capsys.readouterr().out  # a pipe gets the whole command
+
+    monkeypatch.setattr(cli, "_is_terminal", lambda stream: True)
+    monkeypatch.setattr(cli.shutil, "get_terminal_size", lambda fallback=None: os.terminal_size((40, 24)))
+    assert cli.main(["--shell", "powershell", "--list"]) == 0
+    assert cells(capsys.readouterr().out.rstrip("\n")) == 39
+
+
 def test_fit_counts_columns_not_characters():
     assert fit("abc", 3) == "abc"
     assert fit("abcdef", 4) == "abc…"

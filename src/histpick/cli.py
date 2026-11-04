@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 import os
 import shlex
+import shutil
 import sys
 from pathlib import Path
 
 from . import __version__, history, writer
-from .picker import pick
+from .picker import one_line, pick
 from .text import printable
 
 
@@ -139,6 +140,16 @@ def _output_problem(path: Path, force: bool) -> str | None:
     return None
 
 
+def _print_list(items: list[str]) -> None:
+    number_width = len(str(len(items)))
+    # Long commands stay whole in a pipe, and get cut to one row in a terminal.
+    room = shutil.get_terminal_size().columns - number_width - 4 if _is_terminal(sys.stdout) else sys.maxsize
+    for n, c in enumerate(items, 1):
+        print(f"{n:>{number_width}} {'!' if history.looks_secret(c) else ' '} {one_line(c, room)}")
+    if any(history.looks_secret(c) for c in items):
+        print("! = may contain a password or token", file=sys.stderr)
+
+
 def _main(argv: list[str] | None) -> int:
     p = argparse.ArgumentParser(
         prog="histpick",
@@ -186,13 +197,7 @@ def _main(argv: list[str] | None) -> int:
     items = items[: max(args.limit, args.last or 0)]  # --last 500 means 500, whatever --limit says
 
     if args.list:
-        width = len(str(len(items)))
-        for n, c in enumerate(items, 1):
-            first, *rest = c.split("\n")
-            more = f"  (+{len(rest)} lines)" if rest else ""
-            print(f"{n:>{width}} {'!' if history.looks_secret(c) else ' '} {printable(first)}{more}")
-        if any(history.looks_secret(c) for c in items):
-            print("! = may contain a password or token", file=sys.stderr)
+        _print_list(items)
         return 0
 
     path = None
