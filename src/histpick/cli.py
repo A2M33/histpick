@@ -47,20 +47,33 @@ def main(argv: list[str] | None = None) -> int:
         _pause_if_double_clicked()
 
 
-def _double_clicked() -> bool:
-    # A double-clicked histpick.exe gets its own console, with no shell attached to it.
-    if sys.platform != "win32" or not getattr(sys, "frozen", False):
-        return False
+def _console_process_count() -> int:
     import ctypes
 
-    procs = (ctypes.c_uint32 * 2)()
-    return ctypes.windll.kernel32.GetConsoleProcessList(procs, 2) == 1
+    procs = (ctypes.c_uint32 * 4)()  # the call returns the full count even if they don't all fit
+    return ctypes.windll.kernel32.GetConsoleProcessList(procs, 4)
+
+
+def _double_clicked() -> bool:
+    # A double-clicked histpick.exe gets its own console, with no shell attached to it.
+    # A --onefile exe is two processes, the unpacking stub and Python, so two means nobody
+    # started us from a terminal; a shell would be the third.
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+    return _console_process_count() <= 2 and _is_terminal(sys.stdin)
+
+
+def _is_terminal(stream) -> bool:
+    return stream is not None and stream.isatty()
 
 
 def _pause_if_double_clicked() -> None:
     # That console vanishes when we exit; keep it open so the message stays readable.
     if _double_clicked():
-        input("Press Enter to close.")
+        try:
+            input("Press Enter to close.")
+        except (EOFError, KeyboardInterrupt):
+            pass
 
 
 def run_hint(path: Path, shell: str, platform: str = sys.platform) -> str:
