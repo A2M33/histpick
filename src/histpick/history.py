@@ -40,7 +40,7 @@ def powershell_path() -> Path:
     if sys.platform == "win32":
         base = _env_path("APPDATA", _home() / "AppData" / "Roaming") / "Microsoft" / "Windows" / "PowerShell"
     else:
-        base = _data_dir() / "PowerShell"
+        base = _data_dir() / "powershell"  # all lowercase here, and these file systems care
     return base / "PSReadLine" / "ConsoleHost_history.txt"
 
 

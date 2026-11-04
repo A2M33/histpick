@@ -101,6 +101,12 @@ def test_empty_variables_count_as_not_set(tmp_path, monkeypatch):
     assert all(s.path.is_absolute() for s in history.known_shells())
 
 
+def test_powershell_folder_is_lowercase_on_linux_and_macos(tmp_path, monkeypatch):
+    monkeypatch.setattr(history.sys, "platform", "linux")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert history.powershell_path() == tmp_path / "powershell" / "PSReadLine" / "ConsoleHost_history.txt"
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0
