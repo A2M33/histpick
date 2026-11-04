@@ -11,7 +11,7 @@ import pytest
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="needs a POSIX pty")
 
 SRC = str(Path(__file__).resolve().parent.parent / "src")
-CLEAR = b"\x1b[2J"  # the picker clears the screen once per frame
+FRAME = b"\x1b[H"  # the picker sends the cursor home once per frame
 
 
 class Pty:
@@ -39,9 +39,9 @@ class Pty:
                 self.out += chunk
 
     def key(self, data: bytes):
-        frames = self.out.count(CLEAR)
+        frames = self.out.count(FRAME)
         os.write(self.master, data)
-        self.pump(lambda: self.out.count(CLEAR) > frames)
+        self.pump(lambda: self.out.count(FRAME) > frames)
 
     def finish(self, data: bytes) -> int:
         os.write(self.master, data)

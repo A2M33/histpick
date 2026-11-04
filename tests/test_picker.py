@@ -199,7 +199,7 @@ def test_screen_shows_match_count_and_preview(monkeypatch, capsys):
     run_pick(monkeypatch, items, [*"git", ESC, ESC])
     out = capsys.readouterr().out
     assert "1/3" in out
-    assert "  do echo $f\r\n" in out  # first frame: the multi-line command is highlighted
+    assert "  do echo $f\x1b[K\r\n" in out  # first frame: the multi-line command is highlighted
 
 
 def test_filter_editing():

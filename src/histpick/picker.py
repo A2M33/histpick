@@ -347,7 +347,8 @@ def _row(marks: str, plain_marks: str, text: str, selected: bool) -> str:
 
 
 def _paint(lines: list[str]) -> None:
-    sys.stdout.write("\x1b[H\x1b[2J" + "\r\n".join(lines))
+    # Overwrite the frame in place: clearing the screen first makes every key press flicker.
+    sys.stdout.write("\x1b[H" + "\x1b[K\r\n".join(lines) + "\x1b[K\x1b[J")
     sys.stdout.flush()
 
 
