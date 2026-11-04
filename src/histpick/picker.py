@@ -14,10 +14,22 @@ from dataclasses import dataclass, field
 from .history import looks_secret
 from .text import cells, fit, printable
 
-SECRET_MARK = "\x1b[33m!\x1b[0m"  # beside commands that may contain a password or token
-CHOSEN_MARK = "\x1b[32m[x]\x1b[0m"
-LEGEND = f"  {SECRET_MARK} \x1b[2mmay contain a password or token\x1b[0m"
 LEGEND_COLUMNS = 35
+
+
+def color(code: int, text: str) -> str:
+    # https://no-color.org covers colour only, so bold, dim and the highlight stay.
+    return text if os.environ.get("NO_COLOR") else f"\x1b[{code}m{text}\x1b[0m"
+
+
+def secret_mark() -> str:
+    """Beside commands that may contain a password or token."""
+    return color(33, "!")
+
+
+def _legend() -> str:
+    return f"  {secret_mark()} \x1b[2mmay contain a password or token\x1b[0m"
+
 
 # ---------- logic ----------
 
@@ -282,15 +294,16 @@ class _Keys:
 
 # ---------- drawing ----------
 
-def _enable_ansi() -> None:
-    if sys.platform == "win32":
-        import ctypes
+def enable_ansi() -> bool:
+    """Old Windows consoles need escape codes switched on, and very old ones can't do them."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
 
-        k = ctypes.windll.kernel32
-        h = k.GetStdHandle(-11)
-        mode = ctypes.c_uint32()
-        if k.GetConsoleMode(h, ctypes.byref(mode)):
-            k.SetConsoleMode(h, mode.value | 0x0004)
+    k = ctypes.windll.kernel32
+    h = k.GetStdHandle(-11)
+    mode = ctypes.c_uint32()
+    return bool(k.GetConsoleMode(h, ctypes.byref(mode)) and k.SetConsoleMode(h, mode.value | 0x0004))
 
 
 def preview(cmd: str | None, width: int, max_rows: int) -> list[str]:
@@ -323,7 +336,7 @@ def _heading(title: str, detail: str, flagged: bool, cols: int) -> str:
         room -= cells(detail)
         line += f"\x1b[2m{detail}\x1b[0m"
     if flagged and room >= LEGEND_COLUMNS:
-        line += LEGEND
+        line += _legend()
     return line
 
 
@@ -375,7 +388,7 @@ def _draw(s: PickerState, title: str) -> None:
             continue
         cmd = s.items[vis[i]]
         chosen, secret = vis[i] in s.chosen, looks_secret(cmd)
-        marks = f" {CHOSEN_MARK if chosen else '[ ]'} {SECRET_MARK if secret else ' '} "
+        marks = f" {color(32, '[x]') if chosen else '[ ]'} {secret_mark() if secret else ' '} "
         plain = f" {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} "
         lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor, cols))
     _paint(lines + pane + [_help(
@@ -394,7 +407,7 @@ def _draw_review(r: ReviewState, title: str) -> None:
     secrets = sum(looks_secret(c) for c in r.result())
     if secrets:
         warning = f"{secrets} of these may contain a password or token. Check the script before you share it."
-        lines.append(f"{SECRET_MARK} \x1b[33m{fit(warning, cols - 3)}\x1b[0m")
+        lines.append(f"{secret_mark()} {color(33, fit(warning, cols - 3))}")
     else:
         lines.append("\x1b[2m" + fit("The script runs these from top to bottom.", cols - 1) + "\x1b[0m")
     for i in range(r.top, r.top + height):
@@ -403,7 +416,7 @@ def _draw_review(r: ReviewState, title: str) -> None:
             continue
         cmd = r.items[r.order[i]]
         secret = looks_secret(cmd)
-        marks = f" {i + 1:>{width}} {SECRET_MARK if secret else ' '} "
+        marks = f" {i + 1:>{width}} {secret_mark() if secret else ' '} "
         plain = f" {i + 1:>{width}} {'!' if secret else ' '} "
         lines.append(_row(marks, plain, one_line(cmd, cols - width - 5), i == r.cursor, cols))
     _paint(lines + pane + [_help("↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back",
@@ -437,9 +450,8 @@ def pick(items: list[str], title: str = "histpick") -> list[str] | None:
     Enter opens a review screen where you can reorder or drop commands; Enter there
     saves and Esc goes back to the list.
     """
-    if os.environ.get("TERM") == "dumb":
+    if os.environ.get("TERM") == "dumb" or not enable_ansi():
         raise RuntimeError("this terminal can't show the picker; use --pick or --last")
-    _enable_ansi()
     s = PickerState(items)
     review: ReviewState | None = None
     sys.stdout.write("\x1b[?1049h\x1b[?25l")  # alternate screen, hide cursor

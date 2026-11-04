@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, history, writer
-from .picker import one_line, pick
+from .picker import enable_ansi, one_line, pick, secret_mark
 from .text import printable
 
 
@@ -143,9 +143,11 @@ def _output_problem(path: Path, force: bool) -> str | None:
 def _print_list(items: list[str]) -> None:
     number_width = len(str(len(items)))
     # Long commands stay whole in a pipe, and get cut to one row in a terminal.
-    room = shutil.get_terminal_size().columns - number_width - 4 if _is_terminal(sys.stdout) else sys.maxsize
+    terminal = _is_terminal(sys.stdout)
+    room = shutil.get_terminal_size().columns - number_width - 4 if terminal else sys.maxsize
+    mark = secret_mark() if terminal and enable_ansi() else "!"
     for n, c in enumerate(items, 1):
-        print(f"{n:>{number_width}} {'!' if history.looks_secret(c) else ' '} {one_line(c, room)}")
+        print(f"{n:>{number_width}} {mark if history.looks_secret(c) else ' '} {one_line(c, room)}")
     if any(history.looks_secret(c) for c in items):
         print("! = may contain a password or token", file=sys.stderr)
 

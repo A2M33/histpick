@@ -42,6 +42,25 @@ def test_review_frame_fits_the_window(cols, rows, monkeypatch, capsys):
     assert all(cells(line) < cols for line in lines)
 
 
+def test_no_color_keeps_the_highlight_but_drops_the_colours(monkeypatch, capsys):
+    s = PickerState(["export API_TOKEN=x", "git status"], chosen={1})
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    picker._draw(s, "histpick")
+    coloured = capsys.readouterr().out
+    assert "\x1b[33m" in coloured and "\x1b[32m" in coloured
+    monkeypatch.setenv("NO_COLOR", "1")
+    picker._draw(s, "histpick")
+    plain = capsys.readouterr().out
+    assert "\x1b[33m" not in plain and "\x1b[32m" not in plain and "\x1b[7m" in plain
+
+
+def test_terminal_without_escape_codes_gets_an_explanation(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setattr(picker, "enable_ansi", lambda: False)
+    with pytest.raises(RuntimeError, match="can't show the picker"):
+        picker.pick(["ls"])
+
+
 def test_highlight_fills_the_row(monkeypatch, capsys):
     monkeypatch.setattr(picker.shutil, "get_terminal_size", lambda fallback=None: os.terminal_size((50, 24)))
     picker._draw(PickerState(["ls"]), "histpick")

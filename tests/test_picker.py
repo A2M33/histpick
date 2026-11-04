@@ -128,6 +128,7 @@ def run_pick(monkeypatch, items, keys):
     from histpick import picker
 
     monkeypatch.setattr(picker, "_Keys", lambda: ScriptedKeys(keys))
+    monkeypatch.setattr(picker, "enable_ansi", lambda: True)
     monkeypatch.setenv("TERM", "xterm")
     return picker.pick(items)
 
