@@ -42,6 +42,19 @@ def test_review_frame_fits_the_window(cols, rows, monkeypatch, capsys):
     assert all(cells(line) < cols for line in lines)
 
 
+def test_highlight_fills_the_row(monkeypatch, capsys):
+    monkeypatch.setattr(picker.shutil, "get_terminal_size", lambda fallback=None: os.terminal_size((50, 24)))
+    picker._draw(PickerState(["ls"]), "histpick")
+    raw = capsys.readouterr().out
+    row = next(r for r in raw.split("\r\n") if "ls" in r and "filter" not in r)
+    assert cells(ANSI.sub("", row)) == 49
+
+
+def test_help_keeps_esc_on_screen_in_an_80_column_terminal(monkeypatch, capsys):
+    last = frame(picker._draw, PickerState(["ls"]), 80, 24, monkeypatch, capsys)[-1]
+    assert "esc cancel" in last and "…" not in last
+
+
 def test_long_filter_scrolls_to_keep_the_cursor_in_view(monkeypatch, capsys):
     s = PickerState(["ls"])
     for ch in "abcdefghij" * 10:

@@ -341,9 +341,16 @@ def _filter_line(query: str, pos: int, cols: int) -> str:
     return f"{label}{before}{caret}{after}{hint}"
 
 
-def _row(marks: str, plain_marks: str, text: str, selected: bool) -> str:
-    # The selected row uses plain marks: a colour reset inside would end the highlight.
-    return f"\x1b[7m{plain_marks}{text}\x1b[0m" if selected else f"{marks}{text}"
+def _row(marks: str, plain_marks: str, text: str, selected: bool, cols: int) -> str:
+    if not selected:
+        return f"{marks}{text}"
+    # Plain marks here: a colour reset inside would end the highlight, which fills the row.
+    row = plain_marks + text
+    return f"\x1b[7m{row}{' ' * (cols - 1 - cells(row))}\x1b[0m"
+
+
+def _help(full: str, short: str, cols: int) -> str:
+    return "\x1b[2m" + fit(full if cells(full) < cols else short, cols - 1) + "\x1b[0m"
 
 
 def _paint(lines: list[str]) -> None:
@@ -370,9 +377,10 @@ def _draw(s: PickerState, title: str) -> None:
         chosen, secret = vis[i] in s.chosen, looks_secret(cmd)
         marks = f" {CHOSEN_MARK if chosen else '[ ]'} {SECRET_MARK if secret else ' '} "
         plain = f" {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} "
-        lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor))
-    help_ = "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel"
-    _paint(lines + pane + [f"\x1b[2m{fit(help_, cols - 1)}\x1b[0m"])
+        lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor, cols))
+    _paint(lines + pane + [_help(
+        "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel",
+        "↑↓ move  tab choose  ctrl+a all  ctrl+o chosen  enter review  esc cancel", cols)])
 
 
 def _draw_review(r: ReviewState, title: str) -> None:
@@ -397,9 +405,9 @@ def _draw_review(r: ReviewState, title: str) -> None:
         secret = looks_secret(cmd)
         marks = f" {i + 1:>{width}} {SECRET_MARK if secret else ' '} "
         plain = f" {i + 1:>{width}} {'!' if secret else ' '} "
-        lines.append(_row(marks, plain, one_line(cmd, cols - width - 5), i == r.cursor))
-    help_ = "↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back"
-    _paint(lines + pane + [f"\x1b[2m{fit(help_, cols - 1)}\x1b[0m"])
+        lines.append(_row(marks, plain, one_line(cmd, cols - width - 5), i == r.cursor, cols))
+    _paint(lines + pane + [_help("↑↓ select  ctrl+↑↓ or u/d reorder  x remove  enter save  esc back",
+                                 "↑↓ select  u/d reorder  x remove  enter save  esc back", cols)])
 
 
 def _review_key(r: ReviewState, k: str, page: int) -> None:
