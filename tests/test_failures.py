@@ -150,6 +150,12 @@ def test_pick_and_last_can_not_be_combined(ps_history, capsys):
     assert "not allowed with" in capsys.readouterr().err
 
 
+def test_last_can_reach_past_the_default_limit(ps_history, capsys):
+    ps_history.write_text("".join(f"echo {n}\n" for n in range(400)), encoding="utf-8")
+    assert main(["--shell", "powershell", "--last", "350", "--print"]) == 0
+    assert capsys.readouterr().out.count("\necho ") == 350
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

@@ -168,7 +168,7 @@ def _main(argv: list[str] | None) -> int:
         if not items:
             print(f'No command in {shell.path} contains "{args.grep}".', file=sys.stderr)
             return 1
-    items = items[: args.limit]
+    items = items[: max(args.limit, args.last or 0)]  # --last 500 means 500, whatever --limit says
 
     if args.list:
         width = len(str(len(items)))
