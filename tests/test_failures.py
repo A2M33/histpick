@@ -138,6 +138,18 @@ def test_huge_range_is_refused_at_once():
         cli.parse_numbers("²", 10)  # a digit to str.isdigit, but int() can't read it
 
 
+def test_empty_pick_chooses_nothing(ps_history, capsys):
+    assert main(["--shell", "powershell", "--pick", ""]) == 1
+    assert "Nothing chosen" in capsys.readouterr().out
+
+
+def test_pick_and_last_can_not_be_combined(ps_history, capsys):
+    with pytest.raises(SystemExit) as e:
+        main(["--shell", "powershell", "--pick", "1", "--last", "1"])
+    assert e.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

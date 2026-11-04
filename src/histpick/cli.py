@@ -135,8 +135,9 @@ def _main(argv: list[str] | None) -> int:
     p.add_argument("--limit", type=positive, default=300, help="how many recent commands to offer (default 300)")
     p.add_argument("--grep", default="", help="only offer commands containing this text")
     p.add_argument("--list", action="store_true", help="print recent commands with numbers and exit")
-    p.add_argument("--pick", metavar="NUMBERS", help='choose by number without the picker, e.g. "1 3-5"')
-    p.add_argument("--last", type=positive, metavar="N", help="take the last N commands without the picker")
+    choice = p.add_mutually_exclusive_group()
+    choice.add_argument("--pick", metavar="NUMBERS", help='choose by number without the picker, e.g. "1 3-5"')
+    choice.add_argument("--last", type=positive, metavar="N", help="take the last N commands without the picker")
     p.add_argument("--print", action="store_true", help="print the script instead of saving it")
     p.add_argument("--force", action="store_true", help="overwrite the output file")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -181,7 +182,7 @@ def _main(argv: list[str] | None) -> int:
 
     if args.last:
         chosen = list(reversed(items[: args.last]))
-    elif args.pick:
+    elif args.pick is not None:  # --pick "" chooses nothing, it doesn't open the picker
         try:
             idx = parse_numbers(args.pick, len(items))
         except ValueError as e:
