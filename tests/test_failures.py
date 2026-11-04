@@ -73,6 +73,34 @@ def test_reader_that_leaves_early_is_not_an_error(tmp_path):
     assert err == b""
 
 
+def test_no_home_folder_is_not_a_crash(monkeypatch, capsys):
+    def nowhere():
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(history.Path, "home", nowhere)
+    for name in ("APPDATA", "HISTFILE", "XDG_DATA_HOME"):
+        monkeypatch.delenv(name, raising=False)
+    assert main(["--list"]) == 1
+    assert "No shell history found" in capsys.readouterr().err
+
+
+def test_appdata_is_enough_without_a_home_folder(tmp_path, monkeypatch):
+    def nowhere():
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(history.Path, "home", nowhere)
+    monkeypatch.setattr(history.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert str(tmp_path) in str(history.powershell_path())
+
+
+def test_empty_variables_count_as_not_set(tmp_path, monkeypatch):
+    monkeypatch.setattr(history.Path, "home", lambda: tmp_path)
+    for name in ("APPDATA", "HISTFILE", "XDG_DATA_HOME"):
+        monkeypatch.setenv(name, "")
+    assert all(s.path.is_absolute() for s in history.known_shells())
+
+
 def test_closed_stdout_does_not_crash(ps_history, monkeypatch):
     monkeypatch.setattr(sys, "stdout", None)
     assert main(["--shell", "powershell", "--list"]) == 0

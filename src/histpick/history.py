@@ -20,22 +20,37 @@ class Shell:
     path: Path
 
 
+def _home() -> Path:
+    try:
+        return Path.home()
+    except RuntimeError:  # no HOME or USERPROFILE: paths under "~" just won't exist
+        return Path("~")
+
+
+def _env_path(name: str, fallback: Path) -> Path:
+    value = os.environ.get(name)  # set but empty counts as not set
+    return Path(value) if value else fallback
+
+
+def _data_dir() -> Path:
+    return _env_path("XDG_DATA_HOME", _home() / ".local" / "share")
+
+
 def powershell_path() -> Path:
     if sys.platform == "win32":
-        base = Path(os.environ.get("APPDATA", Path.home())) / "Microsoft" / "Windows"
+        base = _env_path("APPDATA", _home() / "AppData" / "Roaming") / "Microsoft" / "Windows" / "PowerShell"
     else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    return base / "PowerShell" / "PSReadLine" / "ConsoleHost_history.txt"
+        base = _data_dir() / "PowerShell"
+    return base / "PSReadLine" / "ConsoleHost_history.txt"
 
 
 def known_shells() -> list[Shell]:
-    home = Path.home()
-    fish_base = Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share"))
+    home = _home()
     return [
         Shell("powershell", ".ps1", powershell_path()),
-        Shell("bash", ".sh", Path(os.environ.get("HISTFILE", home / ".bash_history"))),
+        Shell("bash", ".sh", _env_path("HISTFILE", home / ".bash_history")),
         Shell("zsh", ".sh", home / ".zsh_history"),
-        Shell("fish", ".fish", fish_base / "fish" / "fish_history"),
+        Shell("fish", ".fish", _data_dir() / "fish" / "fish_history"),
     ]
 
 
