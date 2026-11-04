@@ -34,6 +34,10 @@ def test_form_feed_and_unicode_line_separator_stay_inside_a_command():
     assert parse_powershell("echo a\x0cb\r\nls\r\n") == ["echo a\x0cb", "ls"]
 
 
+def test_fish_skips_blank_commands():
+    assert parse_fish("- cmd:  \n  when: 1\n- cmd: ls\n  when: 2\n") == ["ls"]
+
+
 def test_recent_unique_keeps_latest_order():
     assert recent_unique(["a", "b", "a", "c"]) == ["c", "a", "b"]
     assert recent_unique(["a", "b", "c"], limit=2) == ["c", "b"]

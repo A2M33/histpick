@@ -168,7 +168,7 @@ def parse_fish(text: str) -> list[str]:
             cmd = line[len("- cmd: "):]
             cmd = re.sub(r"\\(.)", lambda m: "\n" if m.group(1) == "n" else m.group(1), cmd)
             out.append(cmd)
-    return out
+    return [c for c in out if c.strip()]
 
 
 _SECRET_WORDS = re.compile(r"password|passwd|token|api[_-]?key|secret|\bbearer\s+\S", re.IGNORECASE)
