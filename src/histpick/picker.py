@@ -157,7 +157,7 @@ def _scroll(s, height: int) -> None:
 
 
 def one_line(cmd: str, width: int) -> str:
-    lines = cmd.splitlines() or [""]
+    lines = cmd.split("\n")
     text = lines[0]
     if len(lines) > 1:
         text += f"  (+{len(lines) - 1} lines)"
@@ -274,7 +274,7 @@ def _enable_ansi() -> None:
 
 def preview(cmd: str | None, width: int, max_rows: int) -> list[str]:
     """All lines of a multi-line command, cut to fit; nothing for a one-line command."""
-    lines = (cmd or "").splitlines()
+    lines = (cmd or "").split("\n")
     if len(lines) <= 1:
         return []
     if len(lines) > max_rows:

@@ -29,6 +29,11 @@ def test_fish():
     assert parse_fish(text) == ["ls -la", "echo a\nb", "echo back\\slash"]
 
 
+def test_form_feed_and_unicode_line_separator_stay_inside_a_command():
+    assert parse_bash("printf 'a\x0cb'\necho x y\n") == ["printf 'a\x0cb'", "echo x y"]
+    assert parse_powershell("echo a\x0cb\r\nls\r\n") == ["echo a\x0cb", "ls"]
+
+
 def test_recent_unique_keeps_latest_order():
     assert recent_unique(["a", "b", "a", "c"]) == ["c", "a", "b"]
     assert recent_unique(["a", "b", "c"], limit=2) == ["c", "b"]

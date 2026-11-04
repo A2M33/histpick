@@ -96,10 +96,15 @@ def read(shell: Shell) -> list[str]:
     return parser[shell.name](decode(data))
 
 
+def _lines(text: str) -> list[str]:
+    # Not str.splitlines(): it also breaks at form feeds and U+2028, which can sit in a command.
+    return text.replace("\r\n", "\n").replace("\r", "\n").removesuffix("\n").split("\n")
+
+
 def parse_powershell(text: str) -> list[str]:
     # PSReadLine ends every line except the last of a multi-line command with a backtick.
     out, buf = [], []
-    for line in text.splitlines():
+    for line in _lines(text):
         if line.endswith("`"):
             buf.append(line[:-1])
             continue
@@ -114,7 +119,7 @@ def parse_powershell(text: str) -> list[str]:
 def parse_bash(text: str) -> list[str]:
     # With HISTTIMEFORMAT set, bash writes "#1700000000" before each command.
     out = []
-    for line in text.splitlines():
+    for line in _lines(text):
         if re.fullmatch(r"#\d{9,}", line):
             continue
         if line.strip():
@@ -140,7 +145,7 @@ def parse_zsh(text: str) -> list[str]:
     # Extended history looks like ": 1700000000:0;command". Multi-line commands end
     # each continued line with a backslash.
     out, buf = [], []
-    for line in text.splitlines():
+    for line in _lines(text):
         m = _ZSH_EXTENDED.match(line)
         if m and not buf:
             line = m.group(1)
@@ -158,7 +163,7 @@ def parse_zsh(text: str) -> list[str]:
 def parse_fish(text: str) -> list[str]:
     # fish uses a YAML-like file: "- cmd: ..." with "\n" and "\\" escaped.
     out = []
-    for line in text.splitlines():
+    for line in _lines(text):
         if line.startswith("- cmd: "):
             cmd = line[len("- cmd: "):]
             cmd = re.sub(r"\\(.)", lambda m: "\n" if m.group(1) == "n" else m.group(1), cmd)
