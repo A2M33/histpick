@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
+import re
 import stat
 import sys
 from datetime import datetime
@@ -63,8 +64,15 @@ def save(text: str, path: Path, shell: str, force: bool = False) -> Path:
     return path
 
 
+# The program a command runs: PowerShell needs `& "C:\my tools\x.exe"` for a path with spaces.
+_PROGRAM = re.compile(r"""\s*(?:&\s*)?(?:"([^"]+)"|'([^']+)'|(\S+))""")
+
+
 def is_own_command(cmd: str) -> bool:
-    first = cmd.strip().split(maxsplit=1)[0] if cmd.strip() else ""
+    m = _PROGRAM.match(cmd)
+    if not m:
+        return False
+    first = next(group for group in m.groups() if group)
     # Split on both kinds of slash: a PowerShell history read on Linux still has C:\ paths.
     name = first.replace("\\", "/").rsplit("/", 1)[-1]
     return os.path.splitext(name)[0].lower() == "histpick"

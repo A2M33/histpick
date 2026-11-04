@@ -55,7 +55,12 @@ def test_render_bash_header():
 def test_is_own_command():
     assert is_own_command("histpick --list")
     assert is_own_command(r"C:\tools\histpick.exe -o x")
+    assert is_own_command(r'& "C:\my tools\histpick.exe" --list')
+    assert is_own_command(r"& 'C:\my tools\histpick.exe'")
+    assert is_own_command(r'"C:\my tools\histpick" -o x')
     assert not is_own_command("git status")
+    assert not is_own_command("& git status")
+    assert not is_own_command("   ")
 
 
 def test_grep_searches_past_the_limit(ps_history, capsys):
