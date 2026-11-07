@@ -188,9 +188,13 @@ def _main(argv: list[str] | None) -> int:
         shell = next(s for s in history.known_shells() if s.name == args.shell)
     else:
         shell = history.detect()
-    if shell is None or not shell.path.is_file():
-        where = shell.path if shell else "any known location"
-        print(f"No shell history found in {where}. Try --shell.", file=sys.stderr)
+    if shell is None:
+        print("No shell history found in any known location. Try --shell.", file=sys.stderr)
+        return 1
+    if not shell.path.is_file():  # only with --shell: detect() picks shells whose file exists
+        print(f"No {shell.name} history at {shell.path}.", file=sys.stderr)
+        if shell.name == "bash":
+            print("bash saves history when the shell exits; run `history -a` to save it now.", file=sys.stderr)
         return 1
 
     try:

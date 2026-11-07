@@ -144,6 +144,20 @@ def test_empty_history_says_so(ps_history, capsys):
     assert "has no commands in it" in capsys.readouterr().err
 
 
+def test_missing_history_for_the_chosen_shell(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("HISTFILE", str(tmp_path / "nothing"))
+    assert main(["--shell", "bash", "--list"]) == 1
+    err = capsys.readouterr().err
+    assert f"No bash history at {tmp_path / 'nothing'}" in err
+    assert "Try --shell" not in err and "history -a" in err
+
+
+def test_no_history_anywhere_suggests_shell(monkeypatch, capsys):
+    monkeypatch.setattr(history, "detect", lambda: None)
+    assert main(["--list"]) == 1
+    assert "Try --shell" in capsys.readouterr().err
+
+
 def test_grep_without_matches_says_what_it_searched(ps_history, capsys):
     assert main(["--shell", "powershell", "--grep", "docker", "--list"]) == 1
     assert 'contains "docker"' in capsys.readouterr().err
