@@ -7,6 +7,7 @@ import os
 import shlex
 import shutil
 import sys
+import traceback
 from pathlib import Path
 
 from . import __version__, history, writer
@@ -56,6 +57,12 @@ def main(argv: list[str] | None = None) -> int:
         if _reader_left():
             return 0
         print(f"histpick: error: {e}", file=sys.stderr)
+        return 1
+    except Exception:
+        if not _double_clicked():
+            raise
+        # Otherwise the pause below comes first, and the error flashes past as the window closes.
+        traceback.print_exc()
         return 1
     finally:
         _pause_if_double_clicked()

@@ -77,6 +77,28 @@ def test_printed_script_is_utf8_when_python_ignores_pythonioencoding(tmp_path):
     assert "سلام دنیا" in r.stdout.decode("utf-8")
 
 
+def test_double_clicked_exe_shows_error_before_pausing(ps_history, monkeypatch, capsys):
+    seen = []
+
+    def boom(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(cli.writer, "render", boom)
+    monkeypatch.setattr(cli, "_double_clicked", lambda: True)
+    monkeypatch.setattr(cli, "_pause_if_double_clicked", lambda: seen.append(capsys.readouterr().err))
+    assert main(["--last", "1", "--print"]) == 1
+    assert len(seen) == 1 and "ValueError: boom" in seen[0]
+
+
+def test_unexpected_errors_still_raise_in_a_terminal(ps_history, monkeypatch):
+    def boom(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(cli.writer, "render", boom)
+    with pytest.raises(ValueError):
+        main(["--last", "1", "--print"])
+
+
 def test_reader_that_leaves_early_is_not_an_error(tmp_path):
     p = histpick_process(tmp_path, "--list")
     p.stdout.close()  # what `histpick --list | more` does when you quit more
