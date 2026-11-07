@@ -64,6 +64,19 @@ def test_printed_script_keeps_non_english_text_in_a_pipe(tmp_path):
     assert "سلام دنیا" in out.decode("utf-8")
 
 
+def test_printed_script_is_utf8_when_python_ignores_pythonioencoding(tmp_path):
+    # histpick.exe runs like `python -E`: PYTHONIOENCODING is set but nobody applies it.
+    p = histpick_process(tmp_path, "--last", "1", "--print")
+    p.communicate(timeout=60)
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONUTF8"}
+    env.update(PYTHONIOENCODING="utf-8", APPDATA=str(tmp_path), XDG_DATA_HOME=str(tmp_path))
+    code = f"import sys; sys.path.insert(0, {SRC!r}); from histpick.cli import main; sys.exit(main())"
+    r = subprocess.run([sys.executable, "-E", "-c", code, "--shell", "powershell", "--list"], env=env,
+                       cwd=tmp_path, capture_output=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert "سلام دنیا" in r.stdout.decode("utf-8")
+
+
 def test_reader_that_leaves_early_is_not_an_error(tmp_path):
     p = histpick_process(tmp_path, "--list")
     p.stdout.close()  # what `histpick --list | more` does when you quit more

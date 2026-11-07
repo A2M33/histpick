@@ -71,10 +71,16 @@ def _fix_streams() -> None:
             continue
         # A script redirected with --print > setup.ps1 has to keep its non-English text, so
         # pipes and files get UTF-8. PYTHONIOENCODING still wins if it's set.
-        if not stream.isatty() and not os.environ.get("PYTHONIOENCODING"):
+        if not stream.isatty() and not _io_encoding_from_env():
             stream.reconfigure(encoding="utf-8", errors="replace")
         else:
             stream.reconfigure(errors="replace")
+
+
+def _io_encoding_from_env() -> bool:
+    # histpick.exe ignores the PYTHON* variables, like `python -E`. Leaving the streams
+    # alone there would give a pipe the ANSI code page, not the encoding that was asked for.
+    return bool(os.environ.get("PYTHONIOENCODING")) and not sys.flags.ignore_environment
 
 
 def _reader_left() -> bool:
