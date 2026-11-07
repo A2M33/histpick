@@ -198,6 +198,7 @@ _WIN_KEYS = {0x26: UP, 0x28: DOWN, 0x21: PGUP, 0x22: PGDN, 0x24: HOME, 0x23: END
 _WIN_ALT_CTRL_SHIFT = 0x1F
 _CSI_LETTERS = {"A": UP, "B": DOWN, "C": RIGHT, "D": LEFT, "H": HOME, "F": END}
 _CSI_MODIFIED = {"A": MOVE_UP, "B": MOVE_DOWN}
+_RXVT_MODIFIED = {"a": MOVE_UP, "b": MOVE_DOWN}  # rxvt: Shift+Up is Esc [ a, Ctrl+Up is Esc O a
 _CSI_TILDE = {"1": HOME, "7": HOME, "4": END, "8": END, "5": PGUP, "6": PGDN, "3": DELETE}
 
 
@@ -261,35 +262,55 @@ class _Keys:
         return os.read(self._fd, 1)
 
     def _read_posix(self) -> str:
-        b = self._byte()
-        if not b:
-            return CTRL_C  # end of input
-        if b == b"\x1b":
-            if not self._ready(0.05):
-                return ESC
-            seq = self._byte()
-            if seq not in (b"[", b"O"):
-                return ""  # Alt+key
-            final = b""
-            while self._ready(0.05):
-                final = self._byte()
-                if 0x40 <= final[0] <= 0x7E:
-                    break
-                seq += final
-            params = seq[1:].decode("ascii", "replace").split(";")
-            if final == b"~":
-                return _CSI_TILDE.get(params[0], "")
-            letter = final.decode("ascii", "replace")
-            if len(params) > 1 and letter in _CSI_MODIFIED:  # "1;5A" is Ctrl+Up
-                return _CSI_MODIFIED[letter]
-            return _CSI_LETTERS.get(letter, "")
-        if b[0] >= 0xC0:  # first byte of a multi-byte UTF-8 character
-            need = 1 if b[0] < 0xE0 else 2 if b[0] < 0xF0 else 3
-            while need and self._ready(0.05):
-                b += self._byte()
-                need -= 1
-        ch = b.decode("utf-8", errors="replace")
-        return _CHARS.get(ch, ch)
+        return posix_key(self._byte, lambda: self._ready(0.05))
+
+
+def posix_key(read, more) -> str:
+    """Name one key press from a Unix terminal: a key name, a typed character, or "".
+
+    `read()` returns the next byte (b"" at end of input); `more()` says whether another
+    byte arrives in time to belong to the same key.
+    """
+    b = read()
+    if not b:
+        return CTRL_C  # end of input
+    if b == b"\x1b":
+        if not more():
+            return ESC
+        b = read()
+        if b == b"\x1b" and more():  # Alt+arrow in rxvt and iTerm2: Esc, then the arrow's own sequence
+            b = read()
+            if b in (b"[", b"O"):
+                key = _escape_sequence(b, read, more)
+                return {UP: MOVE_UP, DOWN: MOVE_DOWN}.get(key, key)
+            return ""
+        if b not in (b"[", b"O"):
+            return ""  # Alt+key
+        return _escape_sequence(b, read, more)
+    if b[0] >= 0xC0:  # first byte of a multi-byte UTF-8 character
+        need = 1 if b[0] < 0xE0 else 2 if b[0] < 0xF0 else 3
+        while need and more():
+            b += read()
+            need -= 1
+    ch = b.decode("utf-8", errors="replace")
+    return _CHARS.get(ch, ch)
+
+
+def _escape_sequence(seq: bytes, read, more) -> str:
+    """The rest of a key's escape sequence, after Esc and the [ or O."""
+    final = b""
+    while more():
+        final = read()
+        if 0x40 <= final[0] <= 0x7E:
+            break
+        seq += final
+    params = seq[1:].decode("ascii", "replace").split(";")
+    if final == b"~":
+        return _CSI_TILDE.get(params[0], "")
+    letter = final.decode("ascii", "replace")
+    if len(params) > 1 and letter in _CSI_MODIFIED:  # "1;5A" is Ctrl+Up
+        return _CSI_MODIFIED[letter]
+    return _CSI_LETTERS.get(letter, "") or _RXVT_MODIFIED.get(letter, "")
 
 
 # ---------- drawing ----------

@@ -1,3 +1,5 @@
+import pytest
+
 from histpick.picker import PickerState, one_line
 
 
@@ -167,6 +169,43 @@ def test_windows_key_events():
     assert windows_key(0x43, "\x03", left_ctrl) == picker.CTRL_C
     assert windows_key(0x0D, "\r", 0) == picker.ENTER
     assert windows_key(shift_key, "\0", shift) == ""
+
+
+# What real terminals send, byte for byte. Runs on every OS; test_terminal.py feeds the
+# same decoder through a real pty on Linux and macOS.
+POSIX_KEYS = [
+    # xterm, GNOME Terminal, Windows Terminal over ssh (normal cursor mode)
+    (b"\x1b[A", "up"), (b"\x1b[B", "down"), (b"\x1b[C", "right"), (b"\x1b[D", "left"),
+    (b"\x1b[H", "home"), (b"\x1b[F", "end"), (b"\x1b[5~", "pgup"), (b"\x1b[6~", "pgdn"),
+    (b"\x1b[3~", "delete"), (b"\x1b[1;5A", "move-up"), (b"\x1b[1;3A", "move-up"),
+    (b"\x1b[1;2B", "move-down"), (b"\x1b[1;5H", "home"),
+    # xterm in application cursor mode
+    (b"\x1bOA", "up"), (b"\x1bOB", "down"), (b"\x1bOH", "home"), (b"\x1bOF", "end"),
+    # macOS Terminal: fn+arrows for Home/End, Delete is DEL, fn+Delete deletes forward,
+    # Option+Left/Right send Esc b / Esc f
+    (b"\x7f", "backspace"), (b"\x1bb", ""), (b"\x1bf", ""),
+    # iTerm2 with Option as Esc+, and rxvt: Alt+arrow is Esc followed by the arrow
+    (b"\x1b\x1b[A", "move-up"), (b"\x1b\x1b[B", "move-down"), (b"\x1b\x1bOA", "move-up"),
+    (b"\x1b\x1b[C", "right"),
+    # rxvt and the Linux console
+    (b"\x1b[7~", "home"), (b"\x1b[8~", "end"), (b"\x1b[1~", "home"), (b"\x1b[4~", "end"),
+    (b"\x1bOa", "move-up"), (b"\x1b[b", "move-down"),
+    # function keys mean nothing here
+    (b"\x1bOP", ""), (b"\x1b[15~", ""),
+    # control keys and text
+    (b"\r", "enter"), (b"\t", "tab"), (b"\x01", "ctrl-a"), (b"\x0f", "ctrl-o"), (b"\x15", "ctrl-u"),
+    (b"\x03", "ctrl-c"), (b" ", " "), ("ü".encode(), "ü"), ("中".encode(), "中"), ("🙂".encode(), "🙂"),
+    (b"\x1b", "esc"), (b"", "ctrl-c"),
+]
+
+
+@pytest.mark.parametrize("data, want", POSIX_KEYS)
+def test_posix_key_sequences(data, want):
+    from histpick.picker import posix_key
+
+    pending = [data[i:i + 1] for i in range(len(data))]
+    assert posix_key(lambda: pending.pop(0) if pending else b"", lambda: bool(pending)) == want
+    assert pending == [], "the rest of the sequence would turn up as typed text"
 
 
 def test_chosen_only_view():
