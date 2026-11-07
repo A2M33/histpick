@@ -92,6 +92,7 @@ def test_key_reader_decodes_escape_sequences():
                                (b"\x1b[1;5H", picker.HOME), (b"\x1b[1;5A", picker.MOVE_UP),
                                (b"\x1b[D", picker.LEFT), (b"\x1b[C", picker.RIGHT), (b"\x1b[3~", picker.DELETE),
                                (b"\x15", picker.CTRL_U), (b" ", " "),
+                               (b"\x1b\x1b[A", picker.MOVE_UP), (b"\x1bb", ""), (b"\x7f", picker.BACKSPACE),
                                ("é".encode(), "é"), (b"x", "x")]:
                 os.write(master, data)
                 assert keys.read() == want, data
