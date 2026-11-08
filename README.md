@@ -9,7 +9,7 @@
 
 You spent twenty minutes getting something to work in the terminal: installing a tool, cloning a repo, setting up a virtual environment. Next month you'll need the same steps on another machine. histpick shows your recent commands, you tick the ones that mattered, and it writes them to a script you can run again.
 
-![Picking six setup commands out of PowerShell history](docs/picker.png)
+![The histpick picker over 12 PowerShell history commands: six setup commands are chosen, marked [x] with an amber bar, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
 
 It reads PowerShell, bash, zsh and fish history. PowerShell gets a `.ps1`, the others get a script with the right shebang.
 
