@@ -19,7 +19,7 @@ jobs:
           python-version: "3.13"
       - run: pip install -e ".[dev]" pyinstaller
       - run: pytest -q
-      - run: pyinstaller --onefile --name histpick --paths src packaging/entry.py
+      - run: pyinstaller --onefile --name histpick --icon packaging/histpick.ico --paths src packaging/entry.py
       - run: dist\histpick.exe --version
       - run: gh release upload ${{ github.event.release.tag_name }} dist/histpick.exe --clobber
         env:
