@@ -17,14 +17,17 @@ from .text import cells, fit, printable
 LEGEND_COLUMNS = 35
 
 
-def color(code: int, text: str) -> str:
+AMBER = "38;5;214"  # the A2M33 signal colour in 256 colours; only chosen commands get it
+
+
+def color(code: str, text: str) -> str:
     # https://no-color.org covers colour only, so bold, dim and the highlight stay.
     return text if os.environ.get("NO_COLOR") else f"\x1b[{code}m{text}\x1b[0m"
 
 
 def secret_mark() -> str:
-    """Beside commands that may contain a password or token."""
-    return color(33, "!")
+    """Beside commands that may contain a password or token: bold, so amber stays for chosen ones."""
+    return "\x1b[1m!\x1b[0m"
 
 
 def _legend() -> str:
@@ -411,7 +414,7 @@ def _draw(s: PickerState, title: str) -> None:
             continue
         cmd = s.items[vis[i]]
         chosen, secret = vis[i] in s.chosen, looks_secret(cmd)
-        marks = f" {color(32, '[x]') if chosen else '[ ]'} {secret_mark() if secret else ' '} "
+        marks = f" {color(AMBER, '[x]') if chosen else '[ ]'} {secret_mark() if secret else ' '} "
         plain = f" {'[x]' if chosen else '[ ]'} {'!' if secret else ' '} "
         lines.append(_row(marks, plain, one_line(cmd, cols - 8), i == s.cursor, cols))
     _paint(lines + pane + [_help(
@@ -432,7 +435,7 @@ def _draw_review(r: ReviewState, title: str) -> None:
     secrets = sum(looks_secret(c) for c in r.result())
     if secrets:
         warning = f"{secrets} of these may contain a password or token. Check the script before you share it."
-        lines.append(f"{secret_mark()} {color(33, fit(warning, cols - 3))}")
+        lines.append(f"{secret_mark()} {fit(warning, cols - 3)}")
     else:
         lines.append("\x1b[2m" + fit("The script runs these from top to bottom.", cols - 1) + "\x1b[0m")
     for i in range(r.top, r.top + height):

@@ -47,11 +47,12 @@ def test_no_color_keeps_the_highlight_but_drops_the_colours(monkeypatch, capsys)
     monkeypatch.delenv("NO_COLOR", raising=False)
     picker._draw(s, "histpick")
     coloured = capsys.readouterr().out
-    assert "\x1b[33m" in coloured and "\x1b[32m" in coloured
+    assert "\x1b[38;5;214m[x]" in coloured  # chosen commands are the one amber thing
+    assert not any(f"\x1b[{code}m" in coloured for code in ("31", "32", "33"))  # no red, green or yellow
     monkeypatch.setenv("NO_COLOR", "1")
     picker._draw(s, "histpick")
     plain = capsys.readouterr().out
-    assert "\x1b[33m" not in plain and "\x1b[32m" not in plain and "\x1b[7m" in plain
+    assert "38;5;214" not in plain and "\x1b[7m" in plain and "\x1b[1m!" in plain
 
 
 def test_terminal_without_escape_codes_gets_an_explanation(monkeypatch):
