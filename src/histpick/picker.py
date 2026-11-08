@@ -17,7 +17,7 @@ from .text import cells, fit, printable
 LEGEND_COLUMNS = 35
 
 
-AMBER = "38;5;214"  # the A2M33 signal colour in 256 colours; only chosen commands get it
+AMBER = "38;5;214"  # the A2M33 signal colour in 256 colours: chosen commands and possible secrets
 
 
 def color(code: str, text: str) -> str:
@@ -26,8 +26,8 @@ def color(code: str, text: str) -> str:
 
 
 def secret_mark() -> str:
-    """Beside commands that may contain a password or token: bold, so amber stays for chosen ones."""
-    return "\x1b[1m!\x1b[0m"
+    """Beside commands that may contain a password or token: bold amber, it needs attention."""
+    return f"\x1b[1m{color(AMBER, '!')}\x1b[0m"
 
 
 def _legend() -> str:
@@ -435,7 +435,7 @@ def _draw_review(r: ReviewState, title: str) -> None:
     secrets = sum(looks_secret(c) for c in r.result())
     if secrets:
         warning = f"{secrets} of these may contain a password or token. Check the script before you share it."
-        lines.append(f"{secret_mark()} {fit(warning, cols - 3)}")
+        lines.append(f"{secret_mark()} {color(AMBER, fit(warning, cols - 3))}")
     else:
         lines.append("\x1b[2m" + fit("The script runs these from top to bottom.", cols - 1) + "\x1b[0m")
     for i in range(r.top, r.top + height):

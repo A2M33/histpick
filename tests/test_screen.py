@@ -47,12 +47,25 @@ def test_no_color_keeps_the_highlight_but_drops_the_colours(monkeypatch, capsys)
     monkeypatch.delenv("NO_COLOR", raising=False)
     picker._draw(s, "histpick")
     coloured = capsys.readouterr().out
-    assert "\x1b[38;5;214m[x]" in coloured  # chosen commands are the one amber thing
+    assert "\x1b[38;5;214m[x]" in coloured  # chosen commands are amber
+    assert "\x1b[1m\x1b[38;5;214m!" in coloured  # and so is the possible-secret mark, in bold
     assert not any(f"\x1b[{code}m" in coloured for code in ("31", "32", "33"))  # no red, green or yellow
     monkeypatch.setenv("NO_COLOR", "1")
     picker._draw(s, "histpick")
     plain = capsys.readouterr().out
     assert "38;5;214" not in plain and "\x1b[7m" in plain and "\x1b[1m!" in plain
+
+
+def test_review_warning_about_secrets_is_amber(monkeypatch, capsys):
+    s = ReviewState(["export API_TOKEN=x", "git status"], [0, 1])
+    monkeypatch.setattr(picker.shutil, "get_terminal_size", lambda fallback=None: os.terminal_size((120, 24)))
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    picker._draw_review(s, "histpick")
+    assert "\x1b[38;5;214m1 of these may contain a password or token" in capsys.readouterr().out
+    monkeypatch.setenv("NO_COLOR", "1")
+    picker._draw_review(s, "histpick")
+    plain = capsys.readouterr().out
+    assert "38;5;214" not in plain and "1 of these may contain a password or token" in plain
 
 
 def test_terminal_without_escape_codes_gets_an_explanation(monkeypatch):
