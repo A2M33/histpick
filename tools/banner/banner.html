@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>histpick banner</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="banner.css">
+<script src="trace.js"></script>
+<style>
+  /* One real picker frame (74x15, the demo history from tools/demo/make_picker.py), drawn in HTML */
+  .term { position: absolute; left: 520px; top: 64px; width: 688px; padding: 0 0 18px;
+          background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel);
+          font: 400 14px/1.65 var(--font-code); color: var(--ink); }
+  .term header { display: flex; align-items: center; gap: 10px; padding: 12px 22px; border-bottom: 1px solid var(--line);
+                 font: 500 15px/1 var(--font); color: var(--ink-2); margin-bottom: 12px; }
+  .term p { margin: 0 22px; white-space: pre; }
+  .term .row-hl { margin: 0 22px 0 22px; background: var(--inset); }
+  .term b { font-weight: 500; }
+  .term .dim { color: var(--ink-2); }
+  .term .hit { color: var(--signal-ink); }
+  .term .caret { background: var(--ink-2); }
+</style>
+</head>
+<body>
+<main class="sheet">
+  <section class="intro">
+    <img class="icon" src="icon.png" alt="">
+    <h1>histpick</h1>
+    <p class="sub">Pick the commands that worked from your shell history and save them as a script.</p>
+    <p class="meta"><span class="pad" data-state="live"></span>Python · PowerShell, bash, zsh, fish</p>
+  </section>
+
+  <section class="term" aria-label="Terminal">
+    <header><span class="pad" data-state="live"></span>histpick</header>
+    <p><b>histpick: powershell history</b><span class="dim">  12/12  6 chosen</span></p>
+    <p>filter: <span class="caret"> </span><span class="dim">(type to filter, words in any order)</span></p>
+    <p> [ ]   ping github.com</p>
+    <p> <span class="hit">[x]</span>   winget install --id Git.Git -e</p>
+    <p> [ ]   cls</p>
+    <p> <span class="hit">[x]</span>   cd spacetrail</p>
+    <p> <span class="hit">[x]</span>   git clone https://github.com/A2M33/spacetrail</p>
+    <p> [ ]   Get-ChildItem -Recurse -Filter *.log |  (+1 line)</p>
+    <p> <span class="hit">[x]</span>   winget install --id Python.Python.3.12 -e</p>
+    <p> [ ]   code .</p>
+    <p class="row-hl"> [ ]   Copy-Item .env.example .env</p>
+    <p> [ ]   git log --oneline -5</p>
+    <p> <span class="hit">[x]</span>   .venv\Scripts\pip install -r requirements.txt</p>
+    <p id="t-last"> <span class="hit" id="t-mark">[x]</span>   python -m venv .venv</p>
+    <p class="dim">↑↓ move  tab choose  ctrl+a all  ctrl+o chosen  enter review  esc cancel</p>
+  </section>
+
+  <p class="callout lit" id="c-pick" style="left:560px;top:530px;width:580px"><b>Tick the commands that mattered</b>Tab marks one, Enter shows them in run order, then histpick writes the script</p>
+</main>
+<script>
+  // The lit trace runs up the terminal's left gutter (no text there) and ends beside the last ticked row.
+  const term = document.querySelector(".term").getBoundingClientRect();
+  const mark = document.getElementById("t-mark").getBoundingClientRect();
+  const c = document.getElementById("c-pick").getBoundingClientRect();
+  const gutter = term.left + 11;
+  traces([
+    [[c.left + 4, c.top - 10], [gutter, mark.top + mark.height / 2], { lit: true, r: 3.5, tail: 40 }],
+  ]);
+</script>
+</body>
+</html>

@@ -1,15 +1,15 @@
-<p align="center"><img src="docs/header.svg" alt="histpick" width="100%"></p>
+<p align="center"><img src="docs/banner.png" alt="histpick: pick the commands that worked from your shell history and save them as a script. Beside it, the picker with six of twelve PowerShell commands ticked." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/A2M33/histpick/actions/workflows/test.yml"><img alt="tests" src="https://github.com/A2M33/histpick/actions/workflows/test.yml/badge.svg"></a>
-  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776ab">
-  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-3fb950">
-  <a href="https://github.com/A2M33/histpick/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-3fb950"></a>
+  <a href="https://github.com/A2M33/histpick/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/A2M33/histpick/test.yml?label=tests&style=flat-square&labelColor=111a2d&color=22304b"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-22304b?style=flat-square&labelColor=111a2d&color=22304b">
+  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-22304b?style=flat-square&labelColor=111a2d&color=22304b">
+  <a href="https://github.com/A2M33/histpick/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-22304b?style=flat-square&labelColor=111a2d&color=22304b"></a>
 </p>
 
 You spent twenty minutes getting something to work in the terminal: installing a tool, cloning a repo, setting up a virtual environment. Next month you'll need the same steps on another machine. histpick shows your recent commands, you tick the ones that mattered, and it writes them to a script you can run again.
 
-![The histpick picker over 12 PowerShell history commands: six setup commands are chosen, marked [x] with an amber bar, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
+![The histpick picker over 12 PowerShell history commands: six setup commands are chosen, marked [x] in cyan, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
 
 It reads PowerShell, bash, zsh and fish history. PowerShell gets a `.ps1`, the others get a script with the right shebang.
 
