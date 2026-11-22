@@ -1,23 +1,18 @@
-<p align="center"><img src="docs/banner.png" alt="histpick: pick the commands that worked from your shell history and save them as a script. Beside it, the picker with six of twelve PowerShell commands ticked." width="100%"></p>
+# histpick
 
-<p align="center">
-  <a href="https://github.com/A2M33/histpick/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/A2M33/histpick/test.yml?label=tests&style=flat-square&labelColor=111a2d&color=22304b"></a>
-  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-22304b?style=flat-square&labelColor=111a2d&color=22304b">
-  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-22304b?style=flat-square&labelColor=111a2d&color=22304b">
-  <a href="https://github.com/A2M33/histpick/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-22304b?style=flat-square&labelColor=111a2d&color=22304b"></a>
-</p>
+![The histpick picker over 12 PowerShell history commands: six setup commands are chosen and marked [x] in cyan, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
 
-You spent twenty minutes getting something to work in the terminal: installing a tool, cloning a repo, setting up a virtual environment. Next month you'll need the same steps on another machine. histpick shows your recent commands, you tick the ones that mattered, and it writes them to a script you can run again.
+*One frame of the picker over a made-up PowerShell history, drawn by [tools/demo/make_picker.py](tools/demo/make_picker.py) from the picker's own output.*
 
-![The histpick picker over 12 PowerShell history commands: six setup commands are chosen, marked [x] in cyan, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
+histpick lists your recent shell commands. You tick the ones you want to keep and it writes them to a script you can run again later, for example the setup steps you got working today and will need on another machine next month.
 
-It reads PowerShell, bash, zsh and fish history. PowerShell gets a `.ps1`, the others get a script with the right shebang.
+It reads PowerShell, bash, zsh and fish history. PowerShell history becomes a `.ps1` file, and the other shells get a script with the right shebang.
 
 ## Install
 
-**Windows, no Python needed.** Download `histpick.exe` from the [latest release](https://github.com/A2M33/histpick/releases/latest). Windows SmartScreen may warn you the first time because the file isn't code-signed; click "More info", then "Run anyway". GitHub Actions builds the file from this repository on every release.
+**Windows, no Python needed.** Download `histpick.exe` from the [latest release](https://github.com/A2M33/histpick/releases/latest). Windows SmartScreen may warn you the first time because the file isn't code-signed. Click "More info", then "Run anyway". GitHub Actions builds the file from this repository for each release.
 
-**With Python 3.10 or newer** (Windows, Linux, macOS):
+**With Python 3.10 or newer** (Windows, Linux, macOS). histpick needs nothing outside the standard library.
 
 ```bash
 pip install git+https://github.com/A2M33/histpick
@@ -30,7 +25,7 @@ histpick              # pick commands, save as histpick-<date>.ps1 (or .sh)
 histpick -o setup     # save as setup.ps1 / setup.sh
 ```
 
-After saving, histpick prints the full path and the command that runs the script. On Windows that command is `powershell -ExecutionPolicy Bypass -File "<path>"`, since Windows refuses to run unsigned `.ps1` files by default.
+After saving, histpick prints the full path and the command that runs the script. On Windows that command is `powershell -ExecutionPolicy Bypass -File "<path>"`, because Windows refuses to run unsigned `.ps1` files by default.
 
 | Key | Action |
 | --- | --- |
@@ -44,15 +39,15 @@ After saving, histpick prints the full path and the command that runs the script
 | `Enter` | Review the chosen commands (with nothing chosen, it takes the highlighted one) |
 | `Esc` | Clear the filter; press it again to cancel |
 
-The list shows the newest command first and each command once. The top line counts the matches, like `12/300`. When you highlight a multi-line command, a pane under the list shows all of its lines.
+The list shows the newest command first and each command once. The top line counts the matches, like `12/300`. If you highlight a multi-line command, a pane under the list shows all of its lines.
 
-If you ran a command twice, histpick places it where you ran it last, so the review screen shows the commands in the order they will run before you save:
+A command you ran twice goes where you ran it last. The review screen shows the chosen commands in the order the script will run them, and you can change that order before you save:
 
 | Key | Action |
 | --- | --- |
 | `↑` `↓` | Select a command |
 | `Ctrl+↑` `Ctrl+↓`, or `U` `D` | Move it up or down in the script |
-| `X` or `Backspace` | Remove it |
+| `X`, `Backspace` or `Delete` | Remove it |
 | `Enter` | Save |
 | `Esc` | Go back to the list |
 
@@ -67,9 +62,9 @@ histpick --grep docker          # only offer commands containing "docker"
 
 `--pick` writes the commands in the order you list the numbers. `--last` keeps the order you ran them in.
 
-Other options: `--shell bash` to read another shell's history, `--limit 500` to offer more commands (default 300), `--force` to overwrite a file.
+Other options: `--shell bash` reads another shell's history, `--limit 500` offers more commands (default 300) and `--force` overwrites an existing file.
 
-## What the script looks like
+## The saved script
 
 ```powershell
 # Saved with histpick from PowerShell history on 2026-10-29 13:10
@@ -84,9 +79,9 @@ git clone https://github.com/A2M33/spacetrail
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 ```
 
-The script stops at the first error, the way you would stop if you were typing. `$ErrorActionPreference` stops it when a PowerShell cmdlet fails. Windows PowerShell 5.1 ignores the exit code of programs like `git` and `winget`, so histpick adds the `$LASTEXITCODE` check after each command. bash and zsh scripts get `set -euo pipefail`. fish has no such switch, so each command in a fish script gets `or exit $status` after it.
+The script stops at the first error, as you would if you were typing the commands. `$ErrorActionPreference` stops it when a PowerShell cmdlet fails. Windows PowerShell 5.1 ignores the exit code of programs like `git` and `winget`, so histpick adds a `$LASTEXITCODE` check after each command. bash and zsh scripts get `set -euo pipefail`. fish has no such switch, so histpick puts `or exit $status` after each command in a fish script.
 
-Read the script before you run it: your history may contain one-off commands, passwords typed in clear text or paths that only exist on your machine. histpick puts a `!` next to commands that mention a password, token, secret or API key, or that hold an AWS or GitHub key, both in the picker and in `--list`, and warns you before it saves one. It matches words and key formats, so it can miss a secret, and it will flag `npm token list` too.
+Read the script before you run it. Your history may hold one-off commands, passwords typed in clear text or paths that exist only on your machine. histpick puts a `!` next to commands that mention a password, token, secret or API key, or that contain an AWS or GitHub key. You see the mark in the picker and in `--list`, and histpick warns you before it saves such a command. The check matches words and key formats, so it can miss a secret, and it flags harmless commands like `npm token list` too.
 
 ## Where history comes from
 
@@ -97,7 +92,7 @@ Read the script before you run it: your history may contain one-off commands, pa
 | zsh | `~/.zsh_history` | Plain and extended formats |
 | fish | `~/.local/share/fish/fish_history` | |
 
-Without `--shell`, histpick uses the shell it was started from, or the history file that changed last. Multi-line commands stay intact, and histpick leaves its own calls out of the list.
+Without `--shell`, histpick uses the shell it was started from, or else the history file that changed last. It keeps multi-line commands whole and leaves its own calls out of the list.
 
 ## Development
 
@@ -109,6 +104,8 @@ pytest
 ```
 
 The picker logic lives in `PickerState` (`src/histpick/picker.py`) with no terminal code, so the tests drive it directly. GitHub Actions runs them on Windows, Linux and macOS.
+
+To redraw `docs/picker.png`, install Pillow and run `python tools/demo/make_picker.py`.
 
 ## License
 

@@ -3,7 +3,7 @@
 The picker's own drawing code paints the frame into a buffer at a fixed terminal size, and
 the escape codes are drawn as they come: cyan (45) becomes the signal token, dim the ink-2
 grey, bold JetBrains Mono 500, and the reverse-video highlight an inset row.
-Fonts come from tools/banner/fonts (needs a Pillow built with WOFF2 support).
+Fonts come from tools/demo/fonts (needs a Pillow built with WOFF2 support).
 
     pip install pillow
     python tools/demo/make_picker.py
@@ -25,12 +25,12 @@ sys.path.insert(0, str(REPO / "src"))
 from histpick import picker  # noqa: E402
 from histpick.picker import PickerState  # noqa: E402
 
-FONTS = HERE.parent / "banner" / "fonts"
+FONTS = HERE / "fonts"
 MONO = ImageFont.truetype(str(FONTS / "JetBrainsMono-400.woff2"), 15)
 MONO_BOLD = ImageFont.truetype(str(FONTS / "JetBrainsMono-500.woff2"), 15)
 LABEL = ImageFont.truetype(str(FONTS / "Archivo-500.woff2"), 16)
 
-# Dark values from tokens.css
+# Dark "trace" palette
 GROUND = (0x0B, 0x12, 0x22)
 PANEL = (0x11, 0x1A, 0x2D)
 INSET = (0x18, 0x23, 0x3A)
@@ -123,8 +123,6 @@ def render(lines: list[str]) -> Image.Image:
     top = margin + bar + pad - 4
     for r, line in enumerate(lines):
         x, y = x0, top + r * lh
-        if "38;5;45" in line:  # a cyan bar in the margin beside chosen commands, as in the siblings
-            d.rectangle((x0 - 12, y + 1, x0 - 9, y + lh - 7), fill=SIGNAL)
         for text, colour, bold, rev in spans(line):
             if rev:  # the highlighted row, or the drawn text cursor
                 d.rectangle((x, y - 2, x + len(text) * cw - 1, y + lh - 5), fill=INSET)
