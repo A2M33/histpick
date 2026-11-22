@@ -1,8 +1,25 @@
 # histpick
 
-![The histpick picker over 12 PowerShell history commands: six setup commands are chosen and marked [x] in cyan, and the cursor rests on Copy-Item .env.example .env](docs/picker.png)
+```
+histpick: powershell history  12/12  6 chosen
+filter:  (type to filter, words in any order)
+ [ ]   ping github.com
+ [x]   winget install --id Git.Git -e
+ [ ]   cls
+ [x]   cd spacetrail
+ [x]   git clone https://github.com/A2M33/spacetrail
+ [ ]   Get-ChildItem -Recurse -Filter *.log |  (+1 line)
+ [x]   winget install --id Python.Python.3.12 -e
+ [ ]   code .
+ [ ]   Copy-Item .env.example .env
+ [ ]   git log --oneline -5
+ [x]   .venv\Scripts\pip install -r requirements.txt
+ [x]   python -m venv .venv
 
-*One frame of the picker over a made-up PowerShell history, drawn by [tools/demo/make_picker.py](tools/demo/make_picker.py) from the picker's own output.*
+↑↓ move  tab choose  ctrl+a all  ctrl+o chosen only  ctrl+u clear  enter review  esc clear/cancel
+```
+
+*One frame of the picker over a made-up PowerShell history, printed by [tools/demo/make_picker.py](tools/demo/make_picker.py) with the picker's own drawing code. In the terminal the chosen rows are cyan and the cursor row is highlighted.*
 
 histpick lists your recent shell commands. You tick the ones you want to keep and it writes them to a script you can run again later, for example the setup steps you got working today and will need on another machine next month.
 
@@ -105,7 +122,7 @@ pytest
 
 The picker logic lives in `PickerState` (`src/histpick/picker.py`) with no terminal code, so the tests drive it directly. GitHub Actions runs them on Windows, Linux and macOS.
 
-To redraw `docs/picker.png`, install Pillow and run `python tools/demo/make_picker.py`.
+To print the picker frame at the top of this page again, run `python tools/demo/make_picker.py`.
 
 ## License
 
